@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence https://jakarta.ee/xml/ns/persistence/persistence_3_2.xsd"
+             version="3.2">
+
+    <persistence-unit name="orderPU" transaction-type="JTA">
+        <description>Order sample persistence unit</description>
+
+        <class>com.example.order.domain.Customer</class>
+        <class>com.example.order.domain.Product</class>
+        <class>com.example.order.domain.Order</class>
+        <class>com.example.order.domain.OrderLine</class>
+        <class>com.example.order.domain.Invoice</class>
+
+        <properties>
+            <!-- Hibernate is used by Quarkus. Open Liberty overrides the provider with EclipseLink. -->
+            <property name="hibernate.dialect" value="org.hibernate.dialect.PostgreSQLDialect"/>
+            <property name="hibernate.show_sql" value="false"/>
+            <property name="hibernate.format_sql" value="false"/>
+            <property name="jakarta.persistence.schema-generation.database.action" value="drop-and-create"/>
+            <!-- EclipseLink (Open Liberty / GlassFish) creates the schema at EMF creation,
+                 before @Startup beans such as the data seeder run. -->
+            <property name="eclipselink.ddl-generation" value="drop-and-create-tables"/>
+            <property name="eclipselink.ddl-generation.output-mode" value="database"/>
+        </properties>
+    </persistence-unit>
+</persistence>

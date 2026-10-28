@@ -1,0 +1,14 @@
+target/
+*.class
+*.log
+/data/
+/order-quarkus/data/
+ObjectStore/
+PutObjectStoreDirHere/
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Local JDBC driver for Liberty
+order-liberty/src/main/liberty/config/lib/

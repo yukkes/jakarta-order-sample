@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<job id="orderImportJob" xmlns="https://jakarta.ee/xml/ns/jakartaee" version="2.0">
+
+    <listeners>
+        <listener ref="batchLogListener"/>
+    </listeners>
+
+    <step id="importOrders">
+        <batchlet ref="orderImportBatchlet">
+            <properties>
+                <property name="inputFile" value="#{jobParameters['inputFile']}"/>
+            </properties>
+        </batchlet>
+    </step>
+</job>

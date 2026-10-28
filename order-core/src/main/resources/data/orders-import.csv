@@ -1,0 +1,5 @@
+# customerCode,productCode,quantity,orderDate(optional)
+C001,P001,1,2026-10-01
+C002,P002,3,2026-10-02
+C003,P003,1,2026-10-03
+C001,P004,10

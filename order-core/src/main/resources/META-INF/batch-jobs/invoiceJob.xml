@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<job id="invoiceJob" xmlns="https://jakarta.ee/xml/ns/jakartaee" version="2.0">
+
+    <listeners>
+        <listener ref="batchLogListener"/>
+    </listeners>
+
+    <step id="generateInvoices">
+        <listeners>
+            <listener ref="batchLogListener"/>
+        </listeners>
+        <chunk item-count="5" checkpoint-policy="item" skip-limit="5">
+            <reader ref="invoiceItemReader">
+                <properties>
+                    <property name="billingMonth" value="#{jobParameters['billingMonth']}"/>
+                </properties>
+            </reader>
+            <processor ref="invoiceItemProcessor">
+                <properties>
+                    <property name="billingMonth" value="#{jobParameters['billingMonth']}"/>
+                </properties>
+            </processor>
+            <writer ref="invoiceItemWriter"/>
+            <skippable-exception-classes>
+                <include class="com.example.order.core.batch.InvalidOrderException"/>
+            </skippable-exception-classes>
+        </chunk>
+    </step>
+</job>

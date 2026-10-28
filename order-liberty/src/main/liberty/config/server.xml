@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="Jakarta EE order sample on Open Liberty">
+
+    <featureManager>
+        <feature>jakartaee-11.0</feature>
+        <feature>mpOpenAPI-4.0</feature>
+        <feature>localConnector-1.0</feature>
+    </featureManager>
+
+    <httpEndpoint id="defaultHttpEndpoint"
+                  httpPort="8080"
+                  httpsPort="9443"/>
+
+    <basicRegistry id="basic" realm="BasicRealm">
+        <user name="admin" password="admin"/>
+    </basicRegistry>
+
+    <authorization-roles id="com.ibm.ws.batch">
+        <security-role name="batchAdmin">
+            <user name="admin"/>
+        </security-role>
+        <security-role name="batchSubmitter">
+            <special-subject type="EVERYONE"/>
+        </security-role>
+        <security-role name="batchMonitor">
+            <special-subject type="EVERYONE"/>
+        </security-role>
+    </authorization-roles>
+
+    <!-- Core persistence.xml has no jta-data-source, so point the container at this datasource. -->
+    <jpa defaultJtaDataSourceJndiName="jdbc/orderDB"/>
+
+    <library id="postgresLib">
+        <fileset dir="${server.config.dir}/lib" includes="postgresql-*.jar"/>
+    </library>
+
+    <jdbcDriver id="postgresDriver" libraryRef="postgresLib"/>
+
+    <dataSource id="orderDataSource" jndiName="jdbc/orderDB" jdbcDriverRef="postgresDriver">
+        <properties URL="jdbc:postgresql://localhost:5432/orders"
+                    user="orders"
+                    password="orders"/>
+    </dataSource>
+
+    <application location="order-sample.war"/>
+
+    <logging traceSpecification="com.example.order.*=info"/>
+</server>

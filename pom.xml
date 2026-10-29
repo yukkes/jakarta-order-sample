@@ -18,6 +18,8 @@
         <module>order-core</module>
         <module>order-quarkus</module>
         <module>order-liberty</module>
+        <module>order-wildfly</module>
+        <module>order-glassfish</module>
     </modules>
 
     <properties>

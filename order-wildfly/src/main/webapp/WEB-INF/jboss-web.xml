@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jboss-web xmlns="https://www.jboss.org/j2ee/schema/jboss-web_14_0"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="https://www.jboss.org/j2ee/schema/jboss-web_14_0 https://www.jboss.org/j2ee/schema/jboss-web_14_0.xsd">
+    <context-root>/</context-root>
+</jboss-web>

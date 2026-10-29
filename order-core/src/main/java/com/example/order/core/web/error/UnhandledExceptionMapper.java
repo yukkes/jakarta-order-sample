@@ -3,7 +3,6 @@ package com.example.order.core.web.error;
 import com.example.order.api.model.ErrorResponse;
 import jakarta.json.JsonException;
 import jakarta.json.bind.JsonbException;
-import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.HttpHeaders;
@@ -45,8 +44,10 @@ public class UnhandledExceptionMapper implements ExceptionMapper<Throwable> {
                     known != null ? known.getReasonPhrase() : "HTTP " + status);
         }
 
-        if (exception instanceof ProcessingException && causedByJson(exception)) {
-            // A request body that is not valid JSON. Without this mapper the runtimes answer 400.
+        if (causedByJson(exception)) {
+            // A request body that is not valid JSON. Without this mapper the runtimes answer 500
+            // or a default page. RESTEasy Classic wraps the failure in ProcessingException while
+            // Quarkus REST throws the JsonbException directly, so check the cause chain only.
             return error(Response.status(Response.Status.BAD_REQUEST), 400, "BAD_REQUEST",
                     "リクエストボディの JSON が不正です");
         }

@@ -35,6 +35,10 @@
                  fails and would log noisy EclipseLink-4002 warnings. Remove this property
                  when debugging DDL problems. -->
             <property name="eclipselink.logging.exceptions" value="false"/>
+            <!-- EclipseLink's shared (L2) cache serialises lookups under concurrency and
+                 was the main cost of the product list on Open Liberty. This sample reads
+                 small tables from PostgreSQL, so the DB is faster than the cache. -->
+            <property name="eclipselink.cache.shared.default" value="false"/>
         </properties>
     </persistence-unit>
 </persistence>

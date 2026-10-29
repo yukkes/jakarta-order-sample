@@ -532,9 +532,6 @@ components:
           type: array
           minItems: 1
           maxItems: 100
-          # Field-level cascade: container-element @Valid alone is not honoured by every
-          # runtime's JAX-RS validation integration, a field-level @Valid always is.
-          x-field-extra-annotation: '@jakarta.validation.Valid'
           items:
             $ref: '#/components/schemas/CreateOrderLine'
     OrderLineResponse:

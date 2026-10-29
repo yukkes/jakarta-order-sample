@@ -1,14 +1,84 @@
-# WildFly / GlassFish セットアップ
+# ランタイムの起動と設定
 
-`order-core` の `persistence.xml` は `jta-data-source` を指定せず、**コンテナのデフォルト datasource** を使います。
-そのため、WildFly / GlassFish では PostgreSQL をデフォルト datasource に向ける必要があります。
+同じ `order-core` を Quarkus / Open Liberty / WildFly / GlassFish で動かす手順です。
+共通の運用設定（セキュリティヘッダー、リクエスト上限など）はこのページの
+「共通の運用設定」に、性能とコンテナサイズは [performance.md](performance.md) にまとめています。
 
-以下は PostgreSQL 17 が `localhost:5432/orders`（ユーザー `orders` / パスワード `orders`）で動いている前提の例です。
-パスやバージョンは環境に合わせて読み替えてください。
+## Quarkus（既定）
+
+Quarkus は `order-quarkus` モジュールです。日常の開発はこのランタイムだけで完結します。
+
+```bash
+mvn clean package
+java -Dorder.demo-users=true -jar order-quarkus/target/quarkus-app/quarkus-run.jar
+```
+
+- 画面: <http://localhost:8080/>
+- API: <http://localhost:8080/api/products>
+- `quarkus:dev` を使う場合は、先に `mvn install -DskipTests` が必要です
+  （`order-core` / `order-domain` を JAR 依存として参照するため）
+- native を作る場合:
+
+```bash
+mvn -pl order-quarkus -am package -DskipTests \
+  -Dquarkus.native.enabled=true -Dquarkus.native.container-build=true
+ORDER_DEMO_USERS=true ./order-quarkus/target/order-quarkus-1.0.0-SNAPSHOT-runner
+```
+
+## Open Liberty 26
+`order-liberty` は同じ `order-core` を WAR に包んだアダプタです。
+
+1. PostgreSQL の JDBC ドライバを Liberty のサーバー設定 `lib` に置く
+
+   ```bash
+   mkdir -p order-liberty/src/main/liberty/config/lib
+   find ~/.m2/repository/org/postgresql/postgresql -name 'postgresql-*.jar' | head -1 \
+     | xargs -I{} cp {} order-liberty/src/main/liberty/config/lib/
+   ```
+
+2. PostgreSQL を起動しておく（Docker Compose または Embedded PostgreSQL ランチャー）
+
+3. WAR を作る
+
+   ```bash
+   mvn -pl order-liberty -am package
+   ```
+
+4. Liberty を起動する（Quarkus は停止しておく。どちらも 8080 を使います）
+
+   ```bash
+   mvn -pl order-liberty liberty:create
+   mvn -pl order-liberty liberty:install-feature
+   mvn -pl order-liberty liberty:deploy
+   mvn -pl order-liberty liberty:run
+   ```
+
+`server.xml` のポイント:
+
+- `jakartaee-11.0` ではなく、**このアプリが使う feature だけ**を列挙（`restfulWS-4.0` / `cdi-4.1` / `persistence-3.2` /
+  `batch-2.1` / `concurrent-3.1` など）。起動時間が約半分になる
+- `jpa defaultJtaDataSourceJndiName="jdbc/orderDB"` で、`persistence.xml` に `jta-data-source` を書かずに済ませる
+- PostgreSQL は `jdbcDriver` + `library` で参照（接続情報は `DB_URL` / `DB_USER` / `DB_PASSWORD` の `<variable>`）
+- `ibm-web-ext.xml` でコンテキストルートを `/` にし、Quarkus と同じ `/api/...` でアクセス
+- バッチはアプリが未認証の主体として `JobOperator` を呼ぶため、`batchSubmitter` / `batchMonitor` を `EVERYONE` に設定。
+  `batchAdmin`（他ユーザーのジョブ管理）は使わないので定義しない
+- 月次スケジューラは EJB ではなく Concurrency 3.1 の `concurrent-3.1` を使う
+  （`@Asynchronous(runAt = @Schedule(...))` を CDI の `Startup` イベントで有効化）
+- `localConnector-1.0` はアプリからもドキュメントからも使わないため有効化しない
+
+> `main` の Open Liberty アダプタは、Open Liberty 26.0.0.10 で **API・バッチ・OpenAPI の起動確認済み**です。Quarkus 版と同じ `order-core` / 生成 DTO / ジョブ XML を使っています。
+
+### datasource の共通事項
+
+`persistence.xml` は `jta-data-source` を指定せず、コンテナのデフォルト datasource を使う構成です。
+WildFly / GlassFish では PostgreSQL をデフォルト datasource に向ける必要があります（下の各節を参照）。
+
+Quarkus / Open Liberty / WildFly / GlassFish の 4 ランタイムで、起動・一覧 API・注文の作成/確定/キャンセル・
+請求書バッチ・CSV 取込を確認済みです（下の「共通の運用設定」）。自動テストが動くのは現状 Quarkus のみです。
+
 
 ## WildFly 42
-
-`standalone-full.xml` で起動します（EJB / Batch が必要なため）。
+`standalone-full.xml` で起動します（Jakarta Batch が必要なため）。
 
 ### 1. JDBC ドライバをモジュールとして追加
 
@@ -85,9 +155,9 @@ cp order-wildfly/target/order-sample-wildfly.war \
   $JBOSS_HOME/standalone/deployments/
 ```
 
-## GlassFish 8
 
-フルプロファイルで起動します（EJB / Batch が必要なため）。
+## GlassFish 8
+フルプロファイルで起動します（Jakarta Batch が必要なため）。
 
 ### 1. JDBC ドライバを domain の lib に配置
 
@@ -149,8 +219,11 @@ root context でデプロイするため、起動時に次のような GlassFish
 [WARNING] Context path from ServletContext:  differs from path from bundle: /
 ```
 
-## スモークテスト
+## 共通の運用設定
 
+ランタイムに依存しない設定・確認項目です。起動手順は [runtimes.md](runtimes.md) を参照してください。
+
+### スモークテスト
 起動後に共通のスクリプトで確認できます。
 
 ```bash
@@ -159,8 +232,8 @@ root context でデプロイするため、起動時に次のような GlassFish
 
 `/api/products` と `/api/customers` が 200 を返し、初期データが入っていることを確認します。
 
-## CSV 取込のレポート出力先
 
+### CSV 取込のレポート出力先
 `OrderImportBatchlet` はサーバープロセスの作業ディレクトリ配下に `data/import-report.txt` を出力します。
 `inputFile` で指定する CSV は取込ディレクトリ（既定は作業ディレクトリ配下の `data/import/`）から読みます。
 取込ディレクトリはシステムプロパティ `order.import-dir` または環境変数 `ORDER_IMPORT_DIR` で変更できます。
@@ -172,8 +245,8 @@ WildFly の Docker イメージのように作業ディレクトリが書き込�
 docker exec -u root <container> sh -c 'mkdir -p /opt/jboss/data && chown jboss:jboss /opt/jboss/data'
 ```
 
-## セキュリティヘッダー
 
+### セキュリティヘッダー
 すべてのレスポンス（静的ファイルを含む）に次のヘッダーを付けます。
 
 ```text
@@ -199,10 +272,10 @@ add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" alway
 ```
 
 `X-Forwarded-Proto` を信頼する構成では、`order.trust-forwarded-proto=true` と
-`order.cookie-secure=always` を設定してください（詳細は README の設定表）。
+`order.cookie-secure=always` を設定してください（詳細は [usage.md](usage.md) の設定表）。
 
-## リクエストサイズの上限
 
+### リクエストサイズの上限
 | ランタイム | 設定 | 値 |
 |---|---|---|
 | Quarkus | `quarkus.http.limits.max-body-size` | 1 MiB |
@@ -216,15 +289,15 @@ TLS 終端のリバースプロキシ（nginx の `client_max_body_size` など�
 項目ごとの上限（`maxLength` / `maxItems` / `maximum`）は `order-api/src/main/openapi/order-api.yaml` に
 定義してあり、Bean Validation で 400 になります。
 
-## 起動時の警告
 
+### 起動時の警告
 - **Open Liberty**: 空の DB への初回起動では EclipseLink の `DROP TABLE` 警告が出ます。
   `persistence.xml` の `eclipselink.logging.exceptions=false` で抑制しています。DDL を調査するときは外してください。
 - **WildFly**: `WFLYRS0018` は上記の `resteasy.preferJacksonOverJsonB=false` で解消します。
 - **GlassFish**: root context の `Context path from ServletContext ...` 警告は動作に影響しません。
 
-## 動作確認済みの組み合わせ
 
+### 動作確認済みの組み合わせ
 2026-10-29 時点で、以下を実際に起動して確認しました。
 
 | ランタイム | バージョン | 起動 | 一覧 API | 注文作成→確定→キャンセル | 請求書バッチ | CSV 取込 |
@@ -234,7 +307,7 @@ TLS 終端のリバースプロキシ（nginx の `client_max_body_size` など�
 | WildFly | 42.0.0.Final | ○ | ○ | ○ | ○ | ○ |
 | GlassFish | 8.0.5 | ○ | ○ | ○ | ○ | ○ |
 
-### 2026-10-29 の再確認（CDI Startup / ページング / ソート / Problem Details / 認証）
+#### 2026-10-29 の再確認（CDI Startup / ページング / ソート / Problem Details / 認証）
 
 | ランタイム | 起動 | 初期データ（CDI Startup） | ページング / ソート | Problem Details | 認証（Cookie / Bearer / ロール） | 請求書バッチ | CSV 取込 |
 |---|---|---|---|---|---|---|---|

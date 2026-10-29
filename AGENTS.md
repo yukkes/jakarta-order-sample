@@ -7,6 +7,9 @@ Keep it portable.
 - `order-core` = Jakarta EE API + `order-api` + `order-domain` only.
   No Quarkus/Spring/MicroProfile/Hibernate-specific code or deps.
 - Runtime code only in `order-quarkus` / `order-liberty` / `order-wildfly` / `order-glassfish`.
+- `order-quarkus` uses Quarkus REST (`quarkus-rest` + `quarkus-rest-jsonb`), not RESTEasy Classic.
+- Schedulers stay in the runtime adapters. Liberty / WildFly / GlassFish use Concurrency 3.1
+  `@Asynchronous(runAt = @Schedule(...))`; do not add EJB timers.
 - `web -> service -> repository -> domain`; `EntityManager`/JPQL only in `repository`.
 - DTOs: edit `order-api/src/main/openapi/order-api.yaml`; never edit `target/generated-sources`.
 - List APIs return `PageResponse<T>`: `.content`, `page` 0-based, `size` 1..100,
@@ -49,5 +52,5 @@ DB: `localhost:5432/orders`, `orders/orders`.
 - Tests as non-root; do not commit `target/` or driver JARs.
 
 ## Docs
-`README.md` · `docs/runtime-setup.md` · `docs/jakarta-data-assessment.md` ·
-`docs/spring-parity-assessment.md`
+`README.md` · `docs/usage.md` · `docs/runtimes.md` · `docs/performance.md` ·
+`docs/design.md` · `docs/archive/`（過去の調査）

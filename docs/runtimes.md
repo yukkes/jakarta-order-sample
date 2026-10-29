@@ -77,6 +77,9 @@ Quarkus / Open Liberty / WildFly / GlassFish の 4 ランタイムで、起動�
 ## WildFly 42
 `standalone-full.xml` で起動します（Jakarta Batch が必要なため）。
 
+JDBC ドライバの jar は `order-liberty/src/main/liberty/config/lib/` にコピーされたもの
+（バージョンはルート pom の `postgresql.version` で固定）を使えます。
+
 ### 1. JDBC ドライバをモジュールとして追加
 
 ```bash
@@ -84,7 +87,7 @@ $JBOSS_HOME/bin/jboss-cli.sh --connect
 
 module add \
   --name=org.postgresql \
-  --resources=/path/to/postgresql-42.7.13.jar \
+  --resources=/path/to/postgresql-42.7.14.jar \
   --dependencies=java.sql,jakarta.transaction.api
 ```
 
@@ -159,7 +162,7 @@ cp order-wildfly/target/order-sample-wildfly.war \
 ### 1. JDBC ドライバを domain の lib に配置
 
 ```bash
-cp /path/to/postgresql-42.7.13.jar \
+cp /path/to/postgresql-42.7.14.jar \
   $GLASSFISH_HOME/glassfish/domains/domain1/lib/
 ```
 

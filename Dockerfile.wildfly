@@ -1,0 +1,7 @@
+# Galleon slim WildFly (only the layers the application needs).
+# Build: mvn -pl order-wildfly -Pslim package -DskipTests
+#        docker build -f Dockerfile.wildfly -t order-wildfly:min order-wildfly/target
+FROM eclipse-temurin:21-jre-alpine
+COPY server /opt/wildfly
+EXPOSE 8080
+ENTRYPOINT ["/opt/wildfly/bin/standalone.sh", "-b", "0.0.0.0"]

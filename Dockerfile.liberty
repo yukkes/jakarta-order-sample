@@ -1,0 +1,8 @@
+# Open Liberty needs a shell for its start script, so not distroless.
+# Build: mvn -pl order-liberty liberty:create liberty:install-feature liberty:deploy
+#        docker build -f Dockerfile.liberty -t order-liberty:min order-liberty/target/liberty
+FROM eclipse-temurin:21-jre-alpine
+COPY wlp /opt/wlp
+COPY wlp/usr/servers/orderServer /opt/wlp/usr/servers/orderServer
+EXPOSE 8080
+ENTRYPOINT ["/opt/wlp/bin/server", "run", "orderServer"]

@@ -28,23 +28,24 @@ Spring Boot を使わず、**Jakarta EE の仕様 API だけ**でオンライン
 
 | ランタイム | 起動 | 起動直後 RSS | status（認証なし） | me（認証のみ） | products（認証 + DB） |
 |---|---:|---:|---:|---:|---:|
-| **Quarkus 3.40（JVM / Quarkus REST）** | 3.09 秒 | 305 MB | **160,372** | **132,407** | **13,886** |
-| **Quarkus 3.40（native）** | **1.12 秒** | **132 MB** | 96,288 | 77,787 | 10,115 |
-| Open Liberty 26（feature 最小） | **5.92 秒** | 445 MB | 42,917 | 50,086 | 10,800 |
-| WildFly 42（Jackson / slim） | **6.01 秒** | 502 MB | 61,002 | 53,958 | 11,080 |
-| GlassFish 8 | 9.49 秒 | 519 MB | 27,006 | 23,788 | 3,590 |
+| **Quarkus 3.40.1.1（JVM / Quarkus REST）** | 3.05 秒 | 267 MB | **161,749** | **138,730** | **14,731** |
+| **Quarkus 3.40.1.1（native）** | **1.17 秒** | **132 MB** | 96,929 | 81,077 | 10,544 |
+| Open Liberty 26（feature 最小） | 6.19 秒 | 463 MB | 42,275 | 54,575 | 10,564 |
+| WildFly 42（Jackson / slim） | **6.01 秒** | 502 MB | 62,465 | 55,610 | 11,147 |
+| GlassFish 8 | 9.46 秒 | 534 MB | 27,177 | 24,483 | 3,626 |
 
-- **JSON-P のプロバイダを 1 回だけ解決**するようにして、JWT 検証のコストを削減（`me` が約 12k → 132k）
-- **HTTP/JSON 層は Quarkus（JVM）が最速**（status 160k）。native は 96k で、小さな JSON では JIT が勝る
-- **DB を含む products も Quarkus が最速**（13.9k）。WildFly 11.1k、Liberty 10.8k、native 10.1k、GlassFish 3.6k
-- **native は起動 1.12 秒・132 MB** で JVM の 3.09 秒・305 MB より優位。スループットは JVM より低い
-- 起動は Liberty **5.92 秒**（必要 feature だけに）、WildFly **6.01 秒**（Galleon で slim 化）
+- **JSON-P のプロバイダを 1 回だけ解決**するようにして、JWT 検証のコストを削減（`me` が約 12k → 138k）
+- **HTTP/JSON 層は Quarkus（JVM）が最速**（status 161.7k）。native は 96.9k で、小さな JSON では JIT が勝る
+- **DB を含む products も Quarkus が最速**（14.7k）。WildFly 11.1k、Liberty 10.6k、native 10.5k、GlassFish 3.6k
+- **native は起動 1.17 秒・132 MB** で JVM の 3.05 秒・267 MB より優位。スループットは JVM より低い
+- 起動は WildFly **6.01 秒**（Galleon で slim 化）、Liberty **6.19 秒**（必要 feature だけに）
 - **native では Jakarta Batch が動作しません**（`QuarkusJobRepository` で例外→停止）。API と画面は動作します
 - 以前の 18,200 req/s などの数値は `ab` 測定で、20k 付近からクライアントがボトルネックでした。詳細は
   [docs/performance.md](docs/performance.md) を参照してください
-- コンテナイメージの最小サイズ（native 176 MB / 転送 43 MB など）も同じページにまとめています
+- コンテナイメージの最小サイズ（native 176 MB / 転送 42 MB など）も同じページにまとめています
 
-> 16 vCPU、コア固定なし、DB 初期化、3 回の中央値です。`wrk -t4 -c100` を使用しています。
+> 16 vCPU / 7 GB / WSL2、コア固定なし、DB 初期化、3 回の中央値です。`wrk -t4 -c100 -d10s` を使用しています。
+> 2026-10-30 に Quarkus 3.40.1.1 で全ランタイムを測り直した値です（`scripts/bench.sh`）。
 
 
 ## 構成

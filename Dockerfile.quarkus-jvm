@@ -1,0 +1,8 @@
+# fast-jar on a distroless JRE.
+# Build: mvn -pl order-quarkus -am package -DskipTests
+#        docker build -f Dockerfile.quarkus-jvm -t order-quarkus-jvm:min order-quarkus/target/quarkus-app
+FROM gcr.io/distroless/java21-debian12
+WORKDIR /app
+COPY . /app
+USER 1000:1000
+ENTRYPOINT ["java", "-jar", "/app/quarkus-run.jar"]

@@ -1,0 +1,8 @@
+# Smallest runtime: static-ish native executable on a distroless base.
+# Build: mvn -pl order-quarkus -am package -DskipTests \
+#          -Dquarkus.native.enabled=true -Dquarkus.native.container-build=true
+#        docker build -f Dockerfile.quarkus-native -t order-quarkus-native:min order-quarkus/target
+FROM gcr.io/distroless/base-debian12
+COPY order-quarkus-1.0.0-SNAPSHOT-runner /app/app
+USER 1000:1000
+ENTRYPOINT ["/app/app"]

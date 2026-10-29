@@ -32,6 +32,12 @@ updates:
         patterns:
           - '*'
     ignore:
+      # The sample targets Jakarta EE 11. A major bump of a spec API (CDI 4.1 -> 5.0,
+      # JAX-RS 4.0 -> 5.0, ...) or of the umbrella API means EE 12, which none of the four
+      # runtimes in docs/runtimes.md is validated against yet. Patch/minor bumps still flow.
+      - dependency-name: 'jakarta.*'
+        update-types:
+          - version-update:semver-major
       # Pinned on purpose: the runtimes in docs/runtimes.md are validated against these.
       - dependency-name: io.quarkus.platform:quarkus-bom
       - dependency-name: io.quarkiverse.jberet:quarkus-jberet-bom

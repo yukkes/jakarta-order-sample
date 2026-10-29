@@ -17,7 +17,6 @@
         <dependency>
             <groupId>com.example.order</groupId>
             <artifactId>order-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <dependency>
@@ -80,7 +79,6 @@
             <plugin>
                 <groupId>io.quarkus.platform</groupId>
                 <artifactId>quarkus-maven-plugin</artifactId>
-                <version>${quarkus.platform.version}</version>
                 <extensions>true</extensions>
                 <configuration>
                     <!-- quarkus:dev only: seed the demo accounts admin/admin and user/user. -->
@@ -116,7 +114,6 @@
                     <plugin>
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>exec-maven-plugin</artifactId>
-                        <version>3.6.4</version>
                         <configuration>
                             <classpathScope>test</classpathScope>
                             <mainClass>com.example.order.EmbeddedPostgresLauncher</mainClass>

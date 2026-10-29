@@ -41,6 +41,20 @@ if [ "$ANON_STATUS" != "401" ]; then
 fi
 echo "OK: unauthenticated /api/orders -> 401"
 
+HEADERS="$(curl -sS -D - -o /dev/null "$BASE_URL/")"
+for expected in \
+    "content-security-policy: default-src 'self'" \
+    "content-security-policy: script-src 'self'" \
+    "x-content-type-options: nosniff" \
+    "referrer-policy: no-referrer"; do
+    if ! printf '%s' "$HEADERS" | tr 'A-Z' 'a-z' | grep -qiF -- "$expected"; then
+        echo "NG: セキュリティヘッダがありません: $expected" >&2
+        printf '%s\n' "$HEADERS" >&2
+        exit 1
+    fi
+done
+echo "OK: security headers match order-core SecurityHeaders"
+
 check / 'orders-sort'
 check /api/products '"P001"'
 check /api/customers '"C001"'

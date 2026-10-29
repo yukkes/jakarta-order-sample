@@ -1,11 +1,14 @@
 package com.example.order.core.security;
 
-import com.example.order.PasswordHashes;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
+import java.util.Base64;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,7 +35,7 @@ class PasswordHasherTest {
 
     @Test
     void verifiesAndFlagsHashesWithOlderIterationCount() {
-        String weak = PasswordHashes.pbkdf2("secret", 210_000);
+        String weak = pbkdf2("secret", 210_000);
 
         assertTrue(HASHER.matches("secret", weak));
         assertTrue(HASHER.needsRehash(weak));
@@ -70,5 +73,20 @@ class PasswordHasherTest {
         HASHER.matchesDummy(null);
         HASHER.matchesDummy("");
         HASHER.matchesDummy("anything");
+    }
+
+    /** Builds a stored hash with arbitrary parameters, independently of {@link PasswordHasher}. */
+    private static String pbkdf2(String password, int iterations) {
+        try {
+            byte[] salt = new byte[16];
+            byte[] key = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+                    .generateSecret(new PBEKeySpec(password.toCharArray(), salt, iterations, 256))
+                    .getEncoded();
+            Base64.Encoder encoder = Base64.getEncoder().withoutPadding();
+            return "$pbkdf2-sha256$i=" + iterations + "$" + encoder.encodeToString(salt)
+                    + "$" + encoder.encodeToString(key);
+        } catch (Exception exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 }

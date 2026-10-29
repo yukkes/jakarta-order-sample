@@ -17,16 +17,130 @@
         <dependency>
             <groupId>com.example.order</groupId>
             <artifactId>order-api</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.example.order</groupId>
             <artifactId>order-domain</artifactId>
-            <version>${project.version}</version>
+        </dependency>
+        <!--
+            One dependency per specification that core actually imports. The umbrella
+            jakarta-jakartaee-api is deliberately not used: with it on the classpath
+            nothing stops an EJB timer or a Servlet from creeping into the portable core.
+            All are "provided" because every runtime supplies the implementation.
+        -->
+        <dependency>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>jakarta.platform</groupId>
-            <artifactId>jakarta.jakartaee-api</artifactId>
+            <groupId>jakarta.batch</groupId>
+            <artifactId>jakarta.batch-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.enterprise</groupId>
+            <artifactId>jakarta.enterprise.cdi-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.inject</groupId>
+            <artifactId>jakarta.inject-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.interceptor</groupId>
+            <artifactId>jakarta.interceptor-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.json</groupId>
+            <artifactId>jakarta.json-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.json.bind</groupId>
+            <artifactId>jakarta.json.bind-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.persistence</groupId>
+            <artifactId>jakarta.persistence-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.transaction</groupId>
+            <artifactId>jakarta.transaction-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.ws.rs</groupId>
+            <artifactId>jakarta.ws.rs-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Core logic is container-free, so it is unit-tested here (no Quarkus, no DB). -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+                Enforces the AGENTS.md rule mechanically: the portable core (and the
+                order-api / order-domain jars it depends on) must not reach for a
+                framework, an EJB timer, the Servlet API or a JPA implementation.
+                Transitive check, so a stray runtime dependency is caught here too.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>keep-the-core-portable</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <searchTransitive>true</searchTransitive>
+                                    <excludes>
+                                        <exclude>io.quarkus:*</exclude>
+                                        <exclude>io.quarkiverse:*</exclude>
+                                        <exclude>io.smallrye:*</exclude>
+                                        <exclude>org.springframework*:*</exclude>
+                                        <exclude>org.hibernate.orm:*</exclude>
+                                        <exclude>org.hibernate.validator:*</exclude>
+                                        <exclude>org.eclipse.persistence:*</exclude>
+                                        <exclude>org.jboss.resteasy:*</exclude>
+                                        <exclude>org.jboss.weld:*</exclude>
+                                        <exclude>org.glassfish.jersey*:*</exclude>
+                                        <exclude>jakarta.ejb:*</exclude>
+                                        <exclude>jakarta.faces:*</exclude>
+                                        <exclude>jakarta.servlet:*</exclude>
+                                    </excludes>
+                                    <message>
+                                        order-core must stay runnable on Quarkus, Liberty, WildFly
+                                        and GlassFish: use only the Jakarta EE specification APIs
+                                        declared above (no framework, EJB timer, Servlet or JPA
+                                        implementation). See AGENTS.md.
+                                    </message>
+                                </bannedDependencies>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

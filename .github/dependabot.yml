@@ -1,0 +1,37 @@
+version: 2
+
+updates:
+  # Keeps the action versions in .github/workflows/build.yml current. Dependabot only
+  # rewrites the `uses:` line, so the PR has to be finished with `gh actions-lock`
+  # (github/gh-actions-lock) to refresh .github/workflows/actions.lock — the `lockfile`
+  # job in the workflow fails until that is done.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns:
+          - '*'
+
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: build
+    groups:
+      # One PR for the Jakarta/platform alignment, separate ones for the rest.
+      jakarta:
+        patterns:
+          - 'jakarta.*'
+      everything-else:
+        patterns:
+          - '*'
+    ignore:
+      # Pinned on purpose: the runtimes in docs/runtimes.md are validated against these.
+      - dependency-name: io.quarkus.platform:quarkus-bom
+      - dependency-name: io.quarkiverse.jberet:quarkus-jberet-bom

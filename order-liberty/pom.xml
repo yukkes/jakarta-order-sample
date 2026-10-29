@@ -18,11 +18,23 @@
         <dependency>
             <groupId>com.example.order</groupId>
             <artifactId>order-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>jakarta.platform</groupId>
             <artifactId>jakarta.jakartaee-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            The JDBC driver belongs to the server, not to the WAR (Liberty warns when a
+            data source driver ends up in WEB-INF/lib), so it is provided and copied into
+            src/main/liberty/config/lib by the plugin below. That keeps `mvn package`
+            reproducible instead of relying on a manual `cp` from ~/.m2.
+        -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>${postgresql.version}</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>
@@ -38,9 +50,31 @@
                 </configuration>
             </plugin>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-jdbc-driver</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>copy</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>org.postgresql</groupId>
+                                    <artifactId>postgresql</artifactId>
+                                    <outputDirectory>${project.basedir}/src/main/liberty/config/lib</outputDirectory>
+                                </artifactItem>
+                            </artifactItems>
+                            <overWriteIfNewer>true</overWriteIfNewer>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>io.openliberty.tools</groupId>
                 <artifactId>liberty-maven-plugin</artifactId>
-                <version>3.12.4</version>
                 <configuration>
                     <serverName>orderServer</serverName>
                     <looseApplication>false</looseApplication>

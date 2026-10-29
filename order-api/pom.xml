@@ -14,9 +14,23 @@
     <name>Order API (generated from OpenAPI)</name>
 
     <dependencies>
+        <!-- The generator emits @NotNull/@Size and a @Generated marker and JSON-B naming
+             annotations; nothing else from
+             Jakarta EE. The umbrellas jakartaee-api is not needed here. -->
         <dependency>
-            <groupId>jakarta.platform</groupId>
-            <artifactId>jakarta.jakartaee-api</artifactId>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.json.bind</groupId>
+            <artifactId>jakarta.json.bind-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+            <scope>provided</scope>
         </dependency>
         <!-- Generated models carry Jackson annotations; JSON-B ignores them at runtime. -->
         <dependency>
@@ -30,7 +44,6 @@
             <plugin>
                 <groupId>org.openapitools</groupId>
                 <artifactId>openapi-generator-maven-plugin</artifactId>
-                <version>7.26.0</version>
                 <executions>
                     <execution>
                         <id>generate-openapi-models</id>
@@ -71,7 +84,6 @@
             <plugin>
                 <groupId>io.smallrye</groupId>
                 <artifactId>jandex-maven-plugin</artifactId>
-                <version>3.3.0</version>
                 <executions>
                     <execution>
                         <id>make-index</id>
@@ -84,7 +96,6 @@
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
-                <version>3.6.2</version>
                 <executions>
                     <execution>
                         <id>add-generated-sources</id>

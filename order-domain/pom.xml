@@ -14,9 +14,12 @@
     <name>Order Domain</name>
 
     <dependencies>
+        <!-- Entities carry JPA annotations and nothing else: no Servlet, no CDI, no EJB
+             on this compile classpath. The container supplies the implementation. -->
         <dependency>
-            <groupId>jakarta.platform</groupId>
-            <artifactId>jakarta.jakartaee-api</artifactId>
+            <groupId>jakarta.persistence</groupId>
+            <artifactId>jakarta.persistence-api</artifactId>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 </project>

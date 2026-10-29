@@ -1,0 +1,117 @@
+name: build
+
+# Actions are referenced by an exact release and resolved through actions.lock:
+#   - a tag alone is not a pin. `@v7` (and even `@v7.0.1`) can be re-pointed at another
+#     commit; checkout does not use GitHub's Immutable Releases.
+#   - a commit SHA pins only the action you name, not the actions it uses internally.
+#     actions.lock records the SHA of every nested action too.
+# Update a version here, then run `gh actions-lock` (github/gh-actions-lock) to refresh
+# .github/workflows/actions.lock; a stale lock fails the workflow with "Invalid lockfile".
+# Ranges such as `@v7` are rejected by the tooling, and the `lockfile` job below re-checks
+# the lock on every run so a dependabot bump cannot merge without regenerating it.
+#
+# Local runs with nektos/act: use an image that has gh and Maven (hosted runners do) and
+# run a non-root user, because embedded PostgreSQL refuses initdb as root:
+#   docker build -t act-runner:java - <<'D'
+#   FROM catthehacker/ubuntu:act-latest
+#   COPY gh /usr/local/bin/gh
+#   RUN apt-get update && apt-get install -y --no-install-recommends maven && rm -rf /var/lib/apt/lists/*
+#   D
+#   act -P ubuntu-latest=act-runner:java --container-options="--user 1000:1000"
+# act's artifact server also predates upload-artifact v7 (unknown field "mime_type"), so the
+# upload step only passes on GitHub; every other step runs locally.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # The three WAR adapters need a real container setup to be exercised end to end,
+    # so they are only packaged (and smoke-tested manually) on a weekly run.
+    - cron: '0 3 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lockfile:
+    name: actions.lock is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      # Read-only: fails when a `uses:` version and actions.lock disagree (for example a
+      # dependabot bump whose lockfile was not regenerated with `gh actions-lock`).
+      - name: Verify every action pin matches the lockfile
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh extension install github/gh-actions-lock
+          gh actions-lock --no-fix
+
+  core:
+    name: order-core unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      # No container, no database: the portability and paging rules are unit-tested here.
+      - run: mvn -B -pl order-api,order-domain,order-core -am test
+
+  quarkus:
+    name: order-quarkus tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      # Embedded PostgreSQL: the test suite starts the database itself.
+      - run: mvn -B -pl order-quarkus -am test
+
+  adapters:
+    name: WAR adapters package
+    # Branch builds do not need the two-minute WAR packaging; the weekly run does.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - run: mvn -B -DskipTests package
+      - name: Check that every adapter produced a deployable
+        run: |
+          set -euo pipefail
+          for war in order-liberty/target/order-sample.war \
+                     order-wildfly/target/order-sample-wildfly.war \
+                     order-glassfish/target/order-sample-glassfish.war; do
+            test -s "$war"
+            echo "OK: $war"
+          done
+          test -d order-quarkus/target/quarkus-app
+          echo "OK: order-quarkus/target/quarkus-app"
+          # The JDBC driver belongs to the Liberty server, never to the WAR.
+          if unzip -l order-liberty/target/order-sample.war | grep -q postgresql; then
+            echo "NG: postgresql driver leaked into the WAR" >&2
+            exit 1
+          fi
+          echo "OK: no JDBC driver inside the WAR"
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: wars
+          path: |
+            order-liberty/target/order-sample.war
+            order-wildfly/target/order-sample-wildfly.war
+            order-glassfish/target/order-sample-glassfish.war

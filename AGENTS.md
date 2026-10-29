@@ -13,7 +13,8 @@ Keep it portable.
   `sort=field,asc|desc` repeatable and whitelisted. Never arrays.
 - Errors: default `ErrorResponse`; `Accept: application/problem+json` -> RFC 9457.
 - No `jta-data-source`; no Jakarta Data repos in core.
-- Auth lives in `core/web/auth`: JAX-RS filter + opaque token. No Spring/Quarkus Security in core.
+- Auth lives in `core/web/auth`: JAX-RS filter + stateless HS256 access token (JWT) + opaque refresh token
+  (hashed in DB, used only by `/api/auth/refresh`). No Spring/Quarkus Security in core.
   Use `@RequireRole` (not `@RolesAllowed`) on JAX-RS resources; GlassFish container auth intercepts otherwise.
   Deny by default: every resource method needs `@RequireRole`, `@PublicEndpoint` or `@OptionalAuth`
   (none -> 403). Public: `login`/`session` (`@PublicEndpoint`), `status` (`@OptionalAuth`).
@@ -21,6 +22,8 @@ Keep it portable.
 - UI must stay CSP-safe (`script-src 'self'`, `style-src 'self'`): JS/CSS in external files only,
   no inline `<script>`/`<style>`, no `onclick`, no `style="..."`. Use `data-action` + event delegation.
   Security headers live in each runtime (Quarkus `quarkus.http.header.*`, others `SecurityHeadersFilter`).
+- Dynamic markup is rendered with the vendored lit-html (`resources/vendor/lit-html`, 3.3.3, BSD-3-Clause);
+  do not build HTML strings or set `innerHTML` for data. Static buttons keep `data-action`.
 - Floating labels and focus styling are CSS-only; do not add JS class toggles for them.
 
 ## Commands
@@ -37,6 +40,8 @@ DB: `localhost:5432/orders`, `orders/orders`.
 - `TransactionPhase` is `jakarta.enterprise.event`, not `jakarta.transaction`.
 - Error-capable resources need `@Produces(..., "application/problem+json")` or 406.
 - New sortable field -> update that endpoint's `SortSpec`.
+- Access-token TTL (default 10 min) bounds revocation: disabling a user revokes refresh immediately but the
+  access token keeps working until it expires. Refresh tokens rotate on every use.
 - Quarkus only validates nested DTOs (`lines[].quantity`) if `order-api` carries a Jandex index;
   keep `jandex-maven-plugin` in `order-api/pom.xml`.
 - WildFly/GlassFish CSV import needs writable `data/`.

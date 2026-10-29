@@ -18,6 +18,9 @@ public class AuthTokenRepository {
 
     public void persist(AuthToken token) {
         entityManager.persist(token);
+        // The access token carries the session id. Hibernate assigns IDENTITY ids on insert,
+        // EclipseLink (Liberty / GlassFish) only on flush, so flush to stay portable.
+        entityManager.flush();
     }
 
     public Optional<AuthToken> findByTokenHash(String tokenHash) {

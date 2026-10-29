@@ -1,7 +1,11 @@
+import { html, render } from './vendor/lit-html/lit-html.js';
+import { repeat } from './vendor/lit-html/directives/repeat.js';
+
 const state = {
     products: [],
     allProducts: [],
     customers: [],
+    lines: [],
     polling: null,
     isAdmin: false,
     orders: { page: 0, size: 10, sort: 'id,desc', status: '', totalPages: 0, totalElements: 0, first: true, last: true },
@@ -10,11 +14,9 @@ const state = {
 };
 
 const yen = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' });
-const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-})[c]);
+const el = (id) => document.getElementById(id);
 
-async function api(path, options = {}) {
+async function api(path, options = {}, attempt = 0) {
     const method = (options.method || 'GET').toUpperCase();
     const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
     if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
@@ -22,6 +24,12 @@ async function api(path, options = {}) {
         if (csrf) headers['X-XSRF-TOKEN'] = csrf;
     }
     const response = await fetch(path, { ...options, credentials: 'same-origin', headers });
+    if (response.status === 401 && attempt === 0 && !path.startsWith('/api/auth/')) {
+        // The access token is short-lived and stateless; the refresh token cookie renews it.
+        if (await refreshSession()) {
+            return api(path, options, attempt + 1);
+        }
+    }
     if (response.status === 401) {
         window.location.replace('/login.html');
         throw new Error('認証が必要です');
@@ -42,22 +50,36 @@ function getCookie(name) {
     return part ? part.substring(prefix.length) : '';
 }
 
+let refreshing = null;
+
+/** Exchanges the HttpOnly refresh cookie for a new access token; at most one call in flight. */
+function refreshSession() {
+    refreshing ??= fetch('/api/auth/refresh', { method: 'POST', credentials: 'same-origin' })
+        .then((response) => response.ok)
+        .catch(() => false)
+        .finally(() => { refreshing = null; });
+    return refreshing;
+}
+
 async function loadMe() {
-    const status = await api('/api/auth/status');
+    let status = await api('/api/auth/status');
+    if (!status.authenticated && await refreshSession()) {
+        status = await api('/api/auth/status');
+    }
     if (!status.authenticated) {
         window.location.replace('/login.html');
         throw new Error('認証が必要です');
     }
     const roles = status.roles || [];
     state.isAdmin = roles.includes('ADMIN');
-    document.getElementById('current-user').textContent = status.username;
-    document.getElementById('current-role').textContent = roles.join(' · ');
-    document.getElementById('user-avatar').textContent = (status.username || '?').charAt(0).toUpperCase();
+    el('current-user').textContent = status.username;
+    el('current-role').textContent = roles.join(' · ');
+    el('user-avatar').textContent = (status.username || '?').charAt(0).toUpperCase();
 
     const batchNav = document.querySelector('nav button[data-tab="batch"]');
     if (batchNav) batchNav.hidden = !state.isAdmin;
     if (!state.isAdmin) {
-        const batchTab = document.getElementById('tab-batch');
+        const batchTab = el('tab-batch');
         batchTab.classList.add('hidden');
         batchTab.hidden = true;
         batchTab.setAttribute('aria-hidden', 'true');
@@ -75,21 +97,17 @@ async function logout() {
 }
 
 function toast(message, isError = false) {
-    const el = document.getElementById('toast');
-    el.textContent = message;
-    el.className = 'toast show' + (isError ? ' error' : '');
+    const box = el('toast');
+    box.textContent = message;
+    box.className = 'toast show' + (isError ? ' error' : '');
     clearTimeout(toast.timer);
-    toast.timer = setTimeout(() => { el.className = 'toast'; }, 3800);
+    toast.timer = setTimeout(() => { box.className = 'toast'; }, 3800);
 }
 
 function previousMonth() {
     const now = new Date();
     const date = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function statusBadge(status) {
-    return `<span class="badge ${esc(status)}">${esc(status)}</span>`;
 }
 
 function pageQuery(pageState, extra = {}) {
@@ -113,15 +131,24 @@ function applyPage(pageState, response) {
     return response.content || [];
 }
 
-function pager(pageState, name) {
-    return `<div class="pager">
-        <button class="ghost small" data-action="page" data-pager="${name}" data-direction="prev" ${pageState.first ? 'disabled' : ''}>前へ</button>
-        <span class="page-info">${pageState.page + 1} / ${Math.max(pageState.totalPages, 1)} ページ（${pageState.totalElements} 件）</span>
-        <button class="ghost small" data-action="page" data-pager="${name}" data-direction="next" ${pageState.last ? 'disabled' : ''}>次へ</button>
-    </div>`;
-}
-
 const showError = (error) => toast(error.message, true);
+
+// ---- views (lit-html escapes every interpolation, so no manual esc() is needed) ----
+
+const statusBadge = (status) => html`<span class="badge ${status}">${status}</span>`;
+
+const emptyBox = (message) => html`<div class="empty">${message}</div>`;
+
+const table = (headers, rows) => html`<table>
+    <thead><tr>${headers.map((header) => html`<th>${header}</th>`)}</tr></thead>
+    <tbody>${rows}</tbody>
+</table>`;
+
+const pager = (pageState, name) => html`<div class="pager">
+    <button class="ghost small" ?disabled=${pageState.first} @click=${() => goPage(name, 'prev')}>前へ</button>
+    <span class="page-info">${pageState.page + 1} / ${Math.max(pageState.totalPages, 1)} ページ（${pageState.totalElements} 件）</span>
+    <button class="ghost small" ?disabled=${pageState.last} @click=${() => goPage(name, 'next')}>次へ</button>
+</div>`;
 
 function switchTab(name) {
     if (name === 'batch' && !state.isAdmin) {
@@ -150,33 +177,33 @@ function switchTab(name) {
 async function loadCustomers() {
     const page = await api('/api/customers?page=0&size=100&sort=code,asc');
     state.customers = page.content || [];
-    const select = document.getElementById('customer');
-    select.innerHTML = state.customers
-        .map((customer) => `<option value="${esc(customer.code)}">${esc(customer.code)} — ${esc(customer.name)}</option>`)
-        .join('');
+    render(state.customers.map((customer) => html`
+        <option value=${customer.code}>${customer.code} — ${customer.name}</option>`), el('customer'));
 }
 
 async function loadAllProducts() {
     const page = await api('/api/products?page=0&size=100&sort=code,asc');
     state.allProducts = page.content || [];
-    document.querySelectorAll('.product-select').forEach(renderProductOptions);
+    for (const line of state.lines) {
+        if (!line.productCode) line.productCode = state.allProducts[0]?.code ?? '';
+    }
+    renderLines();
 }
 
 async function loadProductPage() {
     const page = await api(`/api/products?${pageQuery(state.productsPage)}`);
     state.products = applyPage(state.productsPage, page);
-    const body = document.getElementById('products-body');
-    body.innerHTML = (state.products.length === 0
-        ? '<div class="empty">商品はありません。</div>'
-        : table(
-            ['コード', '商品名', '単価', '在庫'],
-            state.products.map((product) => [
-                `<span class="mono">${esc(product.code)}</span>`,
-                esc(product.name),
-                `<span class="num">${yen.format(product.unitPrice)}</span>`,
-                `<span class="num">${product.stock}</span>`
-            ])
-        )) + pager(state.productsPage, 'products');
+    render(html`
+        ${state.products.length === 0
+            ? emptyBox('商品はありません。')
+            : table(['コード', '商品名', '単価', '在庫'], state.products.map((product) => html`
+                <tr>
+                    <td><span class="mono">${product.code}</span></td>
+                    <td>${product.name}</td>
+                    <td><span class="num">${yen.format(product.unitPrice)}</span></td>
+                    <td><span class="num">${product.stock}</span></td>
+                </tr>`))}
+        ${pager(state.productsPage, 'products')}`, el('products-body'));
 }
 
 async function loadProducts() {
@@ -184,67 +211,77 @@ async function loadProducts() {
     await loadProductPage();
 }
 
-function renderProductOptions(select) {
-    const current = select.value;
-    select.innerHTML = state.allProducts
-        .map((product) => `<option value="${esc(product.code)}">${esc(product.code)} — ${esc(product.name)} (${yen.format(product.unitPrice)})</option>`)
-        .join('');
-    if (current) select.value = current;
-}
-
 let lineSequence = 0;
 
 function addLineRow() {
     lineSequence += 1;
-    const productId = `line-product-${lineSequence}`;
-    const quantityId = `line-quantity-${lineSequence}`;
-    const container = document.getElementById('lines');
-    const row = document.createElement('div');
-    row.className = 'line-row';
-    row.innerHTML = `
-        <div class="field">
-            <label for="${productId}">商品</label>
-            <select id="${productId}" class="product-select"></select>
-        </div>
-        <div class="field field-quantity">
-            <label for="${quantityId}">数量</label>
-            <input id="${quantityId}" type="number" class="quantity" value="1" min="1" step="1">
-        </div>
-        <button type="button" class="danger small">削除</button>`;
-    row.querySelector('button').addEventListener('click', () => {
-        if (container.children.length > 1) row.remove();
+    state.lines.push({
+        id: lineSequence,
+        productCode: state.allProducts[0]?.code ?? '',
+        quantity: 1
     });
-    container.appendChild(row);
-    renderProductOptions(row.querySelector('.product-select'));
+    renderLines();
+}
+
+function removeLine(id) {
+    if (state.lines.length <= 1) {
+        return;
+    }
+    state.lines = state.lines.filter((line) => line.id !== id);
+    renderLines();
+}
+
+function renderLines() {
+    render(html`${repeat(state.lines, (line) => line.id, (line) => html`
+        <div class="line-row">
+            <div class="field">
+                <label for="line-product-${line.id}">商品</label>
+                <select id="line-product-${line.id}"
+                        @change=${(event) => { line.productCode = event.target.value; }}>
+                    ${state.allProducts.map((product) => html`
+                        <option value=${product.code} ?selected=${product.code === line.productCode}>
+                            ${product.code} — ${product.name} (${yen.format(product.unitPrice)})
+                        </option>`)}
+                </select>
+            </div>
+            <div class="field field-quantity">
+                <label for="line-quantity-${line.id}">数量</label>
+                <input id="line-quantity-${line.id}" type="number" class="quantity" min="1" step="1"
+                       .value=${String(line.quantity)}
+                       @input=${(event) => { line.quantity = Number(event.target.value); }}>
+            </div>
+            <button type="button" class="danger small" @click=${() => removeLine(line.id)}>削除</button>
+        </div>`)}`, el('lines'));
 }
 
 async function loadOrders() {
     const page = await api(`/api/orders?${pageQuery(state.orders, { status: state.orders.status })}`);
     const orders = applyPage(state.orders, page);
-    document.getElementById('orders-body').innerHTML = (orders.length === 0
-        ? '<div class="empty">注文はまだありません。</div>'
-        : table(
-            ['注文番号', '顧客', '注文日', 'ステータス', '金額', '操作'],
-            orders.map((order) => [
-                `<span class="mono">${esc(order.orderNo)}</span>`,
-                esc(order.customerName),
-                esc(order.orderDate),
-                statusBadge(order.status),
-                `<span class="num">${yen.format(order.totalAmount)}</span>`,
-                actions(order)
-            ])
-        )) + pager(state.orders, 'orders');
+    render(html`
+        ${orders.length === 0
+            ? emptyBox('注文はまだありません。')
+            : table(['注文番号', '顧客', '注文日', 'ステータス', '金額', '操作'], orders.map(orderRow))}
+        ${pager(state.orders, 'orders')}`, el('orders-body'));
 }
 
-function actions(order) {
+const orderRow = (order) => html`<tr>
+    <td><span class="mono">${order.orderNo}</span></td>
+    <td>${order.customerName}</td>
+    <td>${order.orderDate}</td>
+    <td>${statusBadge(order.status)}</td>
+    <td><span class="num">${yen.format(order.totalAmount)}</span></td>
+    <td>${orderActions(order)}</td>
+</tr>`;
+
+function orderActions(order) {
     const buttons = [];
     if (order.status === 'DRAFT') {
-        buttons.push(`<button class="small" data-action="confirm-order" data-id="${order.id}">確定</button>`);
+        buttons.push(html`<button class="small" @click=${() => confirmOrder(order.id)}>確定</button>`);
     }
     if (order.status === 'DRAFT' || order.status === 'CONFIRMED') {
-        buttons.push(`<button class="danger small" data-action="cancel-order" data-id="${order.id}">取消</button>`);
+        buttons.push(html`<button class="danger small" @click=${() => cancelOrder(order.id)}>取消</button>`);
     }
-    return buttons.join(' ') || '<span class="empty">—</span>';
+    return buttons.length === 0 ? html`<span class="empty">—</span>` : buttons;
 }
 
 async function confirmOrder(id) {
@@ -269,19 +306,15 @@ async function cancelOrder(id) {
 
 async function createOrder(event) {
     event.preventDefault();
-    const lines = [...document.querySelectorAll('#lines .line-row')].map((row) => ({
-        productCode: row.querySelector('.product-select').value,
-        quantity: Number(row.querySelector('.quantity').value)
-    }));
     const body = {
-        customerCode: document.getElementById('customer').value,
-        orderDate: document.getElementById('order-date').value || null,
-        lines
+        customerCode: el('customer').value,
+        orderDate: el('order-date').value || null,
+        lines: state.lines.map((line) => ({ productCode: line.productCode, quantity: line.quantity }))
     };
     try {
         const created = await api('/api/orders', { method: 'POST', body: JSON.stringify(body) });
         toast(`注文を作成しました: ${created.orderNo}`);
-        document.getElementById('lines').innerHTML = '';
+        state.lines = [];
         addLineRow();
         await loadOrders();
     } catch (error) {
@@ -290,26 +323,26 @@ async function createOrder(event) {
 }
 
 async function loadInvoices() {
-    const month = document.getElementById('invoice-month').value;
+    const month = el('invoice-month').value;
     const page = await api(`/api/invoices?${pageQuery(state.invoices, { month })}`);
     const invoices = applyPage(state.invoices, page);
-    document.getElementById('invoices-body').innerHTML = (invoices.length === 0
-        ? '<div class="empty">請求書はまだありません。バッチタブから生成してください。</div>'
-        : table(
-            ['請求書番号', '顧客', '注文番号', '対象月', '税抜', '税額'],
-            invoices.map((invoice) => [
-                `<span class="mono">${esc(invoice.invoiceNo)}</span>`,
-                esc(invoice.customerName),
-                `<span class="mono">${esc(invoice.orderNo)}</span>`,
-                esc(invoice.billingMonth),
-                `<span class="num">${yen.format(invoice.totalAmount)}</span>`,
-                `<span class="num">${yen.format(invoice.taxAmount)}</span>`
-            ])
-        )) + pager(state.invoices, 'invoices');
+    render(html`
+        ${invoices.length === 0
+            ? emptyBox('請求書はまだありません。バッチタブから生成してください。')
+            : table(['請求書番号', '顧客', '注文番号', '対象月', '税抜', '税額'], invoices.map((invoice) => html`
+                <tr>
+                    <td><span class="mono">${invoice.invoiceNo}</span></td>
+                    <td>${invoice.customerName}</td>
+                    <td><span class="mono">${invoice.orderNo}</span></td>
+                    <td>${invoice.billingMonth}</td>
+                    <td><span class="num">${yen.format(invoice.totalAmount)}</span></td>
+                    <td><span class="num">${yen.format(invoice.taxAmount)}</span></td>
+                </tr>`))}
+        ${pager(state.invoices, 'invoices')}`, el('invoices-body'));
 }
 
 async function startInvoiceJob() {
-    const month = document.getElementById('batch-month').value;
+    const month = el('batch-month').value;
     try {
         const started = await api(`/api/batch/invoices${month ? `?month=${encodeURIComponent(month)}` : ''}`, { method: 'POST' });
         toast(`請求書バッチを開始しました (execution ${started.executionId})`);
@@ -321,7 +354,7 @@ async function startInvoiceJob() {
 }
 
 async function startImportJob() {
-    const inputFile = document.getElementById('import-file').value.trim();
+    const inputFile = el('import-file').value.trim();
     try {
         const started = await api(`/api/batch/imports${inputFile ? `?inputFile=${encodeURIComponent(inputFile)}` : ''}`, { method: 'POST' });
         toast(`CSV 取込バッチを開始しました (execution ${started.executionId})`);
@@ -334,8 +367,7 @@ async function startImportJob() {
 
 async function pollExecution(executionId) {
     clearInterval(state.polling);
-    const box = document.getElementById('exec-box');
-    box.hidden = false;
+    el('exec-box').hidden = false;
     let attempts = 0;
     const tick = async () => {
         attempts++;
@@ -360,37 +392,29 @@ async function pollExecution(executionId) {
 }
 
 function renderExecution(execution) {
-    const steps = (execution.steps || []).map((step) => `
-        <div class="hint exec-step">
-            step <span class="mono">${esc(step.stepName)}</span>:
-            read=${step.readCount}, write=${step.writeCount}, commit=${step.commitCount},
-            rollback=${step.rollbackCount}, skip=${step.skipCount}
-        </div>`).join('');
-    document.getElementById('exec-box').innerHTML = `
-        <div><strong>execution ${execution.executionId}</strong> — ${esc(execution.jobName)} ${statusBadge(execution.status)}</div>
-        <div class="hint">exit=${esc(execution.exitStatus || '—')} / start=${esc(execution.startTime || '—')} / end=${esc(execution.endTime || '—')}</div>
-        ${steps}`;
+    render(html`
+        <div><strong>execution ${execution.executionId}</strong> — ${execution.jobName} ${statusBadge(execution.status)}</div>
+        <div class="hint">exit=${execution.exitStatus || '—'} / start=${execution.startTime || '—'} / end=${execution.endTime || '—'}</div>
+        ${(execution.steps || []).map((step) => html`
+            <div class="hint exec-step">
+                step <span class="mono">${step.stepName}</span>:
+                read=${step.readCount}, write=${step.writeCount}, commit=${step.commitCount},
+                rollback=${step.rollbackCount}, skip=${step.skipCount}
+            </div>`)}`, el('exec-box'));
 }
 
 async function loadExecutions() {
     const executions = await api('/api/batch/executions?count=10');
-    document.getElementById('executions-body').innerHTML = executions.length === 0
-        ? '<div class="empty">ジョブ実行履歴はありません。</div>'
-        : table(
-            ['Execution', 'ジョブ', 'ステータス', '開始', '終了'],
-            executions.map((execution) => [
-                `<span class="mono">${execution.executionId}</span>`,
-                esc(execution.jobName),
-                statusBadge(execution.status),
-                esc(execution.startTime || '—'),
-                esc(execution.endTime || '—')
-            ])
-        );
-}
-
-function table(headers, rows) {
-    return `<table><thead><tr>${headers.map((header) => `<th>${esc(header)}</th>`).join('')}</tr></thead>
-        <tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    render(executions.length === 0
+        ? emptyBox('ジョブ実行履歴はありません。')
+        : table(['Execution', 'ジョブ', 'ステータス', '開始', '終了'], executions.map((execution) => html`
+            <tr>
+                <td><span class="mono">${execution.executionId}</span></td>
+                <td>${execution.jobName}</td>
+                <td>${statusBadge(execution.status)}</td>
+                <td>${execution.startTime || '—'}</td>
+                <td>${execution.endTime || '—'}</td>
+            </tr>`)), el('executions-body'));
 }
 
 const pagers = {
@@ -401,7 +425,9 @@ const pagers = {
 
 function goPage(name, direction) {
     const pagerState = pagers[name];
-    if (!pagerState) return;
+    if (!pagerState) {
+        return;
+    }
     const pageState = pagerState.state;
     if (direction === 'prev' && !pageState.first) {
         pageState.page--;
@@ -416,11 +442,11 @@ function goPage(name, direction) {
 document.querySelectorAll('nav button').forEach((button) => {
     button.addEventListener('click', () => switchTab(button.dataset.tab));
 });
-document.getElementById('add-line').addEventListener('click', addLineRow);
-document.getElementById('order-form').addEventListener('submit', createOrder);
+el('add-line').addEventListener('click', addLineRow);
+el('order-form').addEventListener('submit', createOrder);
 
-// Single delegated click handler: the markup carries data-action instead of inline
-// onclick attributes, so the page works under a CSP without 'unsafe-inline'.
+// The static buttons in index.html keep data-action; rows and the pager bind their
+// handlers in the template, so no inline handler is ever parsed by the browser.
 const clickActions = {
     'logout': () => logout(),
     'reload-orders': () => loadOrders().catch(showError),
@@ -428,10 +454,7 @@ const clickActions = {
     'reload-invoices': () => loadInvoices().catch(showError),
     'reload-executions': () => loadExecutions().catch(showError),
     'start-invoice-job': () => startInvoiceJob(),
-    'start-import-job': () => startImportJob(),
-    'confirm-order': (button) => confirmOrder(Number(button.dataset.id)),
-    'cancel-order': (button) => cancelOrder(Number(button.dataset.id)),
-    'page': (button) => goPage(button.dataset.pager, button.dataset.direction)
+    'start-import-job': () => startImportJob()
 };
 
 document.addEventListener('click', (event) => {
@@ -442,50 +465,50 @@ document.addEventListener('click', (event) => {
     if (handler) handler(button);
 });
 
-document.getElementById('orders-status').addEventListener('change', (event) => {
+el('orders-status').addEventListener('change', (event) => {
     state.orders.status = event.target.value;
     state.orders.page = 0;
     loadOrders().catch(showError);
 });
-document.getElementById('orders-sort').addEventListener('change', (event) => {
+el('orders-sort').addEventListener('change', (event) => {
     state.orders.sort = event.target.value;
     state.orders.page = 0;
     loadOrders().catch(showError);
 });
-document.getElementById('orders-size').addEventListener('change', (event) => {
+el('orders-size').addEventListener('change', (event) => {
     state.orders.size = Number(event.target.value);
     state.orders.page = 0;
     loadOrders().catch(showError);
 });
-document.getElementById('products-sort').addEventListener('change', (event) => {
+el('products-sort').addEventListener('change', (event) => {
     state.productsPage.sort = event.target.value;
     state.productsPage.page = 0;
     loadProductPage().catch(showError);
 });
-document.getElementById('products-size').addEventListener('change', (event) => {
+el('products-size').addEventListener('change', (event) => {
     state.productsPage.size = Number(event.target.value);
     state.productsPage.page = 0;
     loadProductPage().catch(showError);
 });
-document.getElementById('invoices-sort').addEventListener('change', (event) => {
+el('invoices-sort').addEventListener('change', (event) => {
     state.invoices.sort = event.target.value;
     state.invoices.page = 0;
     loadInvoices().catch(showError);
 });
-document.getElementById('invoices-size').addEventListener('change', (event) => {
+el('invoices-size').addEventListener('change', (event) => {
     state.invoices.size = Number(event.target.value);
     state.invoices.page = 0;
     loadInvoices().catch(showError);
 });
-document.getElementById('invoice-month').addEventListener('change', () => {
+el('invoice-month').addEventListener('change', () => {
     state.invoices.page = 0;
     loadInvoices().catch(showError);
 });
 
 (async function init() {
     const month = previousMonth();
-    document.getElementById('invoice-month').value = month;
-    document.getElementById('batch-month').value = month;
+    el('invoice-month').value = month;
+    el('batch-month').value = month;
     addLineRow();
     try {
         await loadMe();

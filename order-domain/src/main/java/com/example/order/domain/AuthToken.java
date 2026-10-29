@@ -31,9 +31,6 @@ public class AuthToken {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "csrf_token_hash", nullable = false, length = 64)
-    private String csrfTokenHash;
-
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
 
@@ -46,10 +43,9 @@ public class AuthToken {
     protected AuthToken() {
     }
 
-    public AuthToken(String tokenHash, User user, String csrfTokenHash, LocalDateTime expiresAt) {
+    public AuthToken(String tokenHash, User user, LocalDateTime expiresAt) {
         this.tokenHash = tokenHash;
         this.user = user;
-        this.csrfTokenHash = csrfTokenHash;
         this.expiresAt = expiresAt;
         this.lastUsedAt = this.createdAt;
     }
@@ -64,10 +60,6 @@ public class AuthToken {
 
     public User getUser() {
         return user;
-    }
-
-    public String getCsrfTokenHash() {
-        return csrfTokenHash;
     }
 
     public LocalDateTime getExpiresAt() {

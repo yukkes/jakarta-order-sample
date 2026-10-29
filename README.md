@@ -195,3 +195,12 @@ mvn -pl order-quarkus quarkus:dev
 | 性能比較（4 基盤 + native）とコンテナサイズ | [docs/performance.md](docs/performance.md) |
 | 設計上の判断、既知の制約、Spring Boot との差、UI の比較 | [docs/design.md](docs/design.md) |
 | 過去の調査（Jakarta Data / Spring Boot 詳細） | [docs/archive/](docs/archive/) |
+
+## ライセンス
+
+このサンプルは [MIT License](LICENSE) で公開しています。
+
+同梱しているサードパーティ製のファイルは、それぞれのライセンスに従います。
+
+- lit-html 3.3.3（BSD-3-Clause）: `order-core/src/main/resources/META-INF/resources/vendor/lit-html/`
+- Font Awesome Free 6.7.2 のアイコン（CC BY 4.0）: ヘッダー / ログイン / favicon の SVG

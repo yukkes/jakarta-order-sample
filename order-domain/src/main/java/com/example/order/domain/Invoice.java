@@ -12,11 +12,10 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "invoices", uniqueConstraints = @UniqueConstraint(name = "uk_invoices_no", columnNames = "invoice_no"))
-public class Invoice {
+public class Invoice extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -41,9 +40,6 @@ public class Invoice {
 
     @Column(name = "tax_amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal taxAmount;
-
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
 
     protected Invoice() {
     }
@@ -92,9 +88,5 @@ public class Invoice {
 
     public BigDecimal getTaxAmount() {
         return taxAmount;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
     }
 }

@@ -82,6 +82,10 @@
                 <artifactId>quarkus-maven-plugin</artifactId>
                 <version>${quarkus.platform.version}</version>
                 <extensions>true</extensions>
+                <configuration>
+                    <!-- quarkus:dev only: seed the demo accounts admin/admin and user/user. -->
+                    <jvmArgs>-Dorder.demo-users=true</jvmArgs>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>
@@ -91,6 +95,15 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <order.demo-users>true</order.demo-users>
+                    </systemPropertyVariables>
+                </configuration>
             </plugin>
         </plugins>
     </build>

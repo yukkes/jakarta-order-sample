@@ -3,8 +3,10 @@ package com.example.order.core.service;
 import com.example.order.api.model.BatchExecutionResponse;
 import com.example.order.api.model.BatchStartResponse;
 import com.example.order.api.model.StepExecutionResponse;
+import com.example.order.core.batch.ImportFileResolver;
 import com.example.order.core.web.error.BusinessException;
 import jakarta.batch.operations.JobOperator;
+import jakarta.batch.operations.NoSuchJobException;
 import jakarta.batch.runtime.BatchRuntime;
 import jakarta.batch.runtime.BatchStatus;
 import jakarta.batch.runtime.JobExecution;
@@ -38,6 +40,9 @@ public class BatchService {
     @Inject
     private Instance<JobOperator> jobOperatorInstance;
 
+    @Inject
+    private ImportFileResolver importFileResolver;
+
     public BatchStartResponse startInvoiceJob(String month) {
         String billingMonth = normalizeMonth(month);
         Properties parameters = new Properties();
@@ -50,6 +55,11 @@ public class BatchService {
     public BatchStartResponse startImportJob(String inputFile) {
         Properties parameters = new Properties();
         if (inputFile != null && !inputFile.isBlank()) {
+            try {
+                importFileResolver.resolve(inputFile);
+            } catch (IllegalArgumentException exception) {
+                throw BusinessException.badRequest(exception.getMessage());
+            }
             parameters.setProperty("inputFile", inputFile);
         }
 
@@ -76,8 +86,12 @@ public class BatchService {
 
         List<JobExecution> executions = new ArrayList<>();
         for (String name : jobNames) {
-            for (JobInstance instance : operator().getJobInstances(name, 0, limit)) {
-                executions.addAll(operator().getJobExecutions(instance));
+            try {
+                for (JobInstance instance : operator().getJobInstances(name, 0, limit)) {
+                    executions.addAll(operator().getJobExecutions(instance));
+                }
+            } catch (NoSuchJobException exception) {
+                // Liberty throws until the job has been submitted at least once.
             }
         }
 

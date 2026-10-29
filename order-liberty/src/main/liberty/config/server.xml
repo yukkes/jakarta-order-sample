@@ -4,21 +4,20 @@
     <featureManager>
         <feature>jakartaee-11.0</feature>
         <feature>mpOpenAPI-4.0</feature>
-        <feature>localConnector-1.0</feature>
     </featureManager>
 
     <httpEndpoint id="defaultHttpEndpoint"
                   httpPort="8080"
                   httpsPort="9443"/>
 
-    <basicRegistry id="basic" realm="BasicRealm">
-        <user name="admin" password="admin"/>
-    </basicRegistry>
+    <!-- The application authenticates with its own tokens, so no container users are defined.
+         A registry is still required for the ORB that the EJB container starts. -->
+    <basicRegistry id="basic" realm="BasicRealm"/>
 
+    <!-- The app calls JobOperator as an unauthenticated subject, so batch submission and
+         monitoring must be open to EVERYONE. There is no batchAdmin: the sample has no
+         user who manages other users' jobs. -->
     <authorization-roles id="com.ibm.ws.batch">
-        <security-role name="batchAdmin">
-            <user name="admin"/>
-        </security-role>
         <security-role name="batchSubmitter">
             <special-subject type="EVERYONE"/>
         </security-role>
@@ -34,12 +33,18 @@
         <fileset dir="${server.config.dir}/lib" includes="postgresql-*.jar"/>
     </library>
 
+    <!-- Database credentials. Override them with the DB_USER / DB_PASSWORD / DB_URL
+         environment variables (or server.env); the defaults are for local development only. -->
+    <variable name="DB_USER" defaultValue="orders"/>
+    <variable name="DB_PASSWORD" defaultValue="orders"/>
+    <variable name="DB_URL" defaultValue="jdbc:postgresql://localhost:5432/orders"/>
+
     <jdbcDriver id="postgresDriver" libraryRef="postgresLib"/>
 
     <dataSource id="orderDataSource" jndiName="jdbc/orderDB" jdbcDriverRef="postgresDriver">
-        <properties URL="jdbc:postgresql://localhost:5432/orders"
-                    user="orders"
-                    password="orders"/>
+        <properties URL="${DB_URL}"
+                    user="${DB_USER}"
+                    password="${DB_PASSWORD}"/>
     </dataSource>
 
     <application location="order-sample.war"/>

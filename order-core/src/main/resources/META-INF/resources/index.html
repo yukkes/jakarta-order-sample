@@ -3,177 +3,56 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Jakarta EE Order Sample</title>
-    <style>
-        :root {
-            --bg: #f4f6fb;
-            --card: #ffffff;
-            --ink: #1f2937;
-            --muted: #6b7280;
-            --line: #e5e7eb;
-            --accent: #1d4ed8;
-            --accent-soft: #dbeafe;
-            --ok: #047857;
-            --warn: #b45309;
-            --bad: #b91c1c;
-            --radius: 14px;
-        }
-        * { box-sizing: border-box; }
-        body {
-            margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
-            background: var(--bg);
-            color: var(--ink);
-            line-height: 1.55;
-        }
-        header {
-            background: linear-gradient(120deg, #0f172a, #1d4ed8 65%, #38bdf8);
-            color: white;
-            padding: 28px 32px 22px;
-        }
-        header h1 { margin: 0 0 6px; font-size: 1.55rem; letter-spacing: .02em; }
-        header p { margin: 0; color: #dbeafe; font-size: .92rem; }
-        nav {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            padding: 14px 32px;
-            background: white;
-            border-bottom: 1px solid var(--line);
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-        nav button {
-            border: 1px solid var(--line);
-            background: white;
-            color: var(--ink);
-            padding: 8px 14px;
-            border-radius: 999px;
-            cursor: pointer;
-            font-size: .9rem;
-        }
-        nav button.active { background: var(--accent); border-color: var(--accent); color: white; }
-        main { max-width: 1180px; margin: 0 auto; padding: 24px 20px 60px; }
-        section.card {
-            background: var(--card);
-            border: 1px solid var(--line);
-            border-radius: var(--radius);
-            box-shadow: 0 10px 30px rgba(15, 23, 42, .05);
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        section.hidden { display: none; }
-        .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-        h2 { margin: 0; font-size: 1.15rem; }
-        h3 { font-size: .98rem; margin: 18px 0 8px; }
-        .hint { color: var(--muted); font-size: .85rem; margin: 4px 0 12px; }
-        .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
-        .field { display: flex; flex-direction: column; gap: 4px; min-width: 140px; }
-        .field label { font-size: .8rem; color: var(--muted); }
-        input, select, button { font: inherit; }
-        input, select {
-            border: 1px solid var(--line);
-            border-radius: 9px;
-            padding: 8px 10px;
-            background: white;
-            color: var(--ink);
-        }
-        button {
-            border: 0;
-            border-radius: 9px;
-            padding: 9px 14px;
-            cursor: pointer;
-            background: var(--accent);
-            color: white;
-            font-weight: 600;
-            font-size: .88rem;
-        }
-        button.secondary { background: var(--accent-soft); color: var(--accent); }
-        button.ghost { background: white; color: var(--ink); border: 1px solid var(--line); }
-        button.danger { background: #fee2e2; color: var(--bad); }
-        button:disabled { opacity: .55; cursor: not-allowed; }
-        button.small { padding: 5px 9px; font-size: .78rem; }
-        .line-row { display: flex; gap: 8px; align-items: end; margin-bottom: 8px; }
-        .line-row .field { flex: 1; }
-        table { width: 100%; border-collapse: collapse; font-size: .87rem; }
-        th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
-        th { color: var(--muted); font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
-        tbody tr:hover { background: #f8fafc; }
-        .num { text-align: right; font-variant-numeric: tabular-nums; }
-        .badge {
-            display: inline-block;
-            border-radius: 999px;
-            padding: 2px 9px;
-            font-size: .74rem;
-            font-weight: 700;
-            letter-spacing: .03em;
-            background: #eef2ff;
-            color: #4338ca;
-        }
-        .badge.DRAFT { background: #eef2ff; color: #4338ca; }
-        .badge.CONFIRMED { background: #dcfce7; color: var(--ok); }
-        .badge.INVOICED { background: #e0f2fe; color: #0369a1; }
-        .badge.CANCELLED { background: #f3f4f6; color: var(--muted); }
-        .badge.COMPLETED { background: #dcfce7; color: var(--ok); }
-        .badge.STARTED, .badge.STARTING { background: #fef3c7; color: var(--warn); }
-        .badge.FAILED, .badge.ABANDONED { background: #fee2e2; color: var(--bad); }
-        .badge.STOPPED, .badge.STOPPING { background: #f3f4f6; color: var(--muted); }
-        .empty { color: var(--muted); font-size: .87rem; padding: 14px 4px; }
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        @media (max-width: 820px) { .grid-2 { grid-template-columns: 1fr; } header, nav { padding-left: 18px; padding-right: 18px; } }
-        .exec-box {
-            border: 1px solid var(--line);
-            border-radius: 11px;
-            padding: 12px 14px;
-            background: #f8fafc;
-            margin-top: 10px;
-            font-size: .87rem;
-        }
-        .exec-box strong { font-variant-numeric: tabular-nums; }
-        .toast {
-            position: fixed;
-            right: 20px;
-            bottom: 20px;
-            max-width: 440px;
-            padding: 12px 16px;
-            border-radius: 10px;
-            background: #0f172a;
-            color: white;
-            box-shadow: 0 12px 30px rgba(15, 23, 42, .28);
-            opacity: 0;
-            transform: translateY(8px);
-            transition: .2s;
-            pointer-events: none;
-            font-size: .88rem;
-            z-index: 50;
-        }
-        .toast.show { opacity: 1; transform: translateY(0); }
-        .toast.error { background: var(--bad); }
-        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .82rem; }
-    </style>
+    <meta name="description" content="Jakarta EE 11 order management sample with JAX-RS, CDI, JPA, Bean Validation, Jakarta Batch, and portable authentication.">
+    <meta name="theme-color" content="#1976d2">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <title>Order Sample — Jakarta EE 11</title>
+    <link rel="stylesheet" href="index.css">
 </head>
 <body>
-<header>
-    <h1>Jakarta EE Order Sample</h1>
-    <p>JAX-RS / CDI / JPA / Bean Validation / Jakarta Batch — running on Quarkus with a Liberty-ready core</p>
+<a class="skip-link" href="#main">本文へスキップ</a>
+<header class="app-bar">
+    <div class="app-bar-inner">
+        <div class="brand">
+            <span class="brand-mark" aria-hidden="true">
+                <!-- Font Awesome Free 6.7.2 — file-circle-check (CC BY 4.0) https://fontawesome.com -->
+                <svg viewBox="0 0 576 512" focusable="false">
+                    <path fill="currentColor" d="M0 64C0 28.7 28.7 0 64 0L224 0l0 128c0 17.7 14.3 32 32 32l128 0 0 38.6C310.1 219.5 256 287.4 256 368c0 59.1 29.1 111.3 73.7 143.3c-3.2 .5-6.4 .7-9.7 .7L64 512c-35.3 0-64-28.7-64-64L0 64zm384 64l-128 0L256 0 384 128zM288 368a144 144 0 1 1 288 0 144 144 0 1 1 -288 0zm211.3-43.3c-6.2-6.2-16.4-6.2-22.6 0L416 385.4l-28.7-28.7c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l40 40c6.2 6.2 16.4 6.2 22.6 0l72-72c6.2-6.2 6.2-16.4 0-22.6z"/>
+                </svg>
+            </span>
+            <div class="brand-text">
+                <h1>Order Sample</h1>
+                <p>Jakarta EE 11</p>
+            </div>
+        </div>
+        <div class="session" aria-label="ログイン中のユーザー">
+            <span class="avatar" id="user-avatar" aria-hidden="true">?</span>
+            <div class="session-text">
+                <span class="session-name" id="current-user"></span>
+                <span class="session-role" id="current-role"></span>
+            </div>
+            <button class="small" type="button" data-action="logout">ログアウト</button>
+        </div>
+    </div>
 </header>
 
-<nav>
-    <button class="active" data-tab="orders">注文</button>
-    <button data-tab="products">商品</button>
-    <button data-tab="invoices">請求書</button>
-    <button data-tab="batch">バッチ</button>
+<nav class="tabs" aria-label="メインナビゲーション" role="tablist">
+    <div class="tabs-inner">
+        <button class="active" id="tab-orders-button" data-tab="orders" role="tab" aria-selected="true" aria-current="page" aria-controls="tab-orders">注文</button>
+        <button id="tab-products-button" data-tab="products" role="tab" aria-selected="false" aria-controls="tab-products">商品</button>
+        <button id="tab-invoices-button" data-tab="invoices" role="tab" aria-selected="false" aria-controls="tab-invoices">請求書</button>
+        <button id="tab-batch-button" data-tab="batch" role="tab" aria-selected="false" aria-controls="tab-batch">バッチ</button>
+    </div>
 </nav>
 
-<main>
-    <section class="card" id="tab-orders">
+<main id="main" tabindex="-1">
+    <section class="card" id="tab-orders" role="tabpanel" aria-labelledby="tab-orders-button" aria-hidden="false">
         <div class="section-head">
             <div>
                 <h2>注文</h2>
                 <p class="hint">注文は DRAFT → CONFIRMED → INVOICED と進みます。確定時に在庫を引き当てます。</p>
             </div>
-            <button class="ghost small" onclick="loadOrders()">再読込</button>
+            <button class="ghost small" data-action="reload-orders">再読込</button>
         </div>
 
         <form id="order-form">
@@ -189,28 +68,82 @@
             </div>
             <h3>明細</h3>
             <div id="lines"></div>
-            <div class="row" style="margin-top:8px">
+            <div class="row mt-8">
                 <button type="button" class="secondary" id="add-line">明細を追加</button>
                 <button type="submit">注文を作成</button>
             </div>
         </form>
 
         <h3>注文一覧</h3>
+        <div class="row mb-10">
+            <div class="field">
+                <label for="orders-status">ステータス</label>
+                <select id="orders-status">
+                    <option value="">すべて</option>
+                    <option value="DRAFT">DRAFT</option>
+                    <option value="CONFIRMED">CONFIRMED</option>
+                    <option value="INVOICED">INVOICED</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="orders-sort">並び順</label>
+                <select id="orders-sort">
+                    <option value="id,desc">ID 降順</option>
+                    <option value="id,asc">ID 昇順</option>
+                    <option value="orderDate,desc">注文日 降順</option>
+                    <option value="orderDate,asc">注文日 昇順</option>
+                    <option value="status,asc">ステータス 昇順</option>
+                    <option value="totalAmount,desc">金額 降順</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="orders-size">表示件数</label>
+                <select id="orders-size">
+                    <option value="2">2</option>
+                    <option value="5">5</option>
+                    <option value="10" selected>10</option>
+                    <option value="20">20</option>
+                </select>
+            </div>
+        </div>
         <div id="orders-body"></div>
     </section>
 
-    <section class="card hidden" id="tab-products">
+    <section class="card hidden" id="tab-products" role="tabpanel" aria-labelledby="tab-products-button" aria-hidden="true">
         <div class="section-head">
             <div>
                 <h2>商品</h2>
                 <p class="hint">在庫は注文確定時に減り、キャンセル時に戻ります。</p>
             </div>
-            <button class="ghost small" onclick="loadProducts()">再読込</button>
+            <button class="ghost small" data-action="reload-products">再読込</button>
+        </div>
+        <div class="row mb-10">
+            <div class="field">
+                <label for="products-sort">並び順</label>
+                <select id="products-sort">
+                    <option value="code,asc">コード 昇順</option>
+                    <option value="code,desc">コード 降順</option>
+                    <option value="name,asc">商品名 昇順</option>
+                    <option value="unitPrice,desc">単価 降順</option>
+                    <option value="stock,desc">在庫 降順</option>
+                    <option value="stock,asc">在庫 昇順</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="products-size">表示件数</label>
+                <select id="products-size">
+                    <option value="2">2</option>
+                    <option value="5">5</option>
+                    <option value="10" selected>10</option>
+                    <option value="20">20</option>
+                </select>
+            </div>
         </div>
         <div id="products-body"></div>
     </section>
 
-    <section class="card hidden" id="tab-invoices">
+    <section class="card hidden" id="tab-invoices" role="tabpanel" aria-labelledby="tab-invoices-button" aria-hidden="true">
         <div class="section-head">
             <div>
                 <h2>請求書</h2>
@@ -221,19 +154,41 @@
                     <label for="invoice-month">対象月</label>
                     <input type="month" id="invoice-month">
                 </div>
-                <button class="ghost small" onclick="loadInvoices()">再読込</button>
+                <button class="ghost small" data-action="reload-invoices">再読込</button>
+            </div>
+        </div>
+        <div class="row mb-10">
+            <div class="field">
+                <label for="invoices-sort">並び順</label>
+                <select id="invoices-sort">
+                    <option value="id,desc">ID 降順</option>
+                    <option value="id,asc">ID 昇順</option>
+                    <option value="invoiceNo,asc">請求書番号 昇順</option>
+                    <option value="billingMonth,desc">対象月 降順</option>
+                    <option value="totalAmount,desc">税抜金額 降順</option>
+                    <option value="createdAt,desc">作成日時 降順</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="invoices-size">表示件数</label>
+                <select id="invoices-size">
+                    <option value="2">2</option>
+                    <option value="5">5</option>
+                    <option value="10" selected>10</option>
+                    <option value="20">20</option>
+                </select>
             </div>
         </div>
         <div id="invoices-body"></div>
     </section>
 
-    <section class="card hidden" id="tab-batch">
+    <section class="card hidden" id="tab-batch" role="tabpanel" aria-labelledby="tab-batch-button" aria-hidden="true">
         <div class="section-head">
             <div>
                 <h2>バッチ</h2>
                 <p class="hint">Jakarta Batch のチャンクジョブとバッチレットを REST から起動します。</p>
             </div>
-            <button class="ghost small" onclick="loadExecutions()">再読込</button>
+            <button class="ghost small" data-action="reload-executions">再読込</button>
         </div>
 
         <div class="grid-2">
@@ -245,325 +200,31 @@
                         <label for="batch-month">対象月</label>
                         <input type="month" id="batch-month">
                     </div>
-                    <button onclick="startInvoiceJob()">バッチ実行</button>
+                    <button type="button" data-action="start-invoice-job">バッチ実行</button>
                 </div>
             </div>
             <div>
                 <h3>注文 CSV 取込（バッチレット）</h3>
-                <p class="hint">classpath の <span class="mono">data/orders-import.csv</span> を読み、1 行ずつ独立トランザクションで登録します。</p>
+                <p class="hint">既定では classpath の <span class="mono">data/orders-import.csv</span> を読み、1 行ずつ独立トランザクションで登録します。入力ファイルを指定する場合は、サーバーの取込ディレクトリ（既定 <span class="mono">data/import/</span>）に置いた <span class="mono">.csv</span> のファイル名だけを入力してください（例: <span class="mono">orders.csv</span>）。</p>
                 <div class="row">
                     <div class="field">
-                        <label for="import-file">入力ファイル（任意）</label>
-                        <input type="text" id="import-file" placeholder="data/orders-import.csv">
+                        <label for="import-file">入力ファイル名（任意）</label>
+                        <input type="text" id="import-file" placeholder=" ">
                     </div>
-                    <button onclick="startImportJob()">取込実行</button>
+                    <button type="button" data-action="start-import-job">取込実行</button>
                 </div>
             </div>
         </div>
 
-        <div id="exec-box" class="exec-box" style="display:none"></div>
+        <div id="exec-box" class="exec-box" hidden></div>
 
         <h3>最近のジョブ実行</h3>
         <div id="executions-body"></div>
     </section>
 </main>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script>
-    const state = { products: [], customers: [], polling: null };
-
-    const yen = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' });
-    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    })[c]);
-
-    async function api(path, options = {}) {
-        const response = await fetch(path, {
-            headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-            ...options
-        });
-        const type = response.headers.get('content-type') || '';
-        const body = type.includes('application/json') ? await response.json() : null;
-        if (!response.ok) {
-            const message = body?.message || body?.error || `HTTP ${response.status}`;
-            throw new Error(message);
-        }
-        return body;
-    }
-
-    function toast(message, isError = false) {
-        const el = document.getElementById('toast');
-        el.textContent = message;
-        el.className = 'toast show' + (isError ? ' error' : '');
-        clearTimeout(toast.timer);
-        toast.timer = setTimeout(() => { el.className = 'toast'; }, 3800);
-    }
-
-    function previousMonth() {
-        const now = new Date();
-        const date = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    }
-
-    function statusBadge(status) {
-        return `<span class="badge ${esc(status)}">${esc(status)}</span>`;
-    }
-
-    function switchTab(name) {
-        document.querySelectorAll('nav button').forEach((button) => {
-            button.classList.toggle('active', button.dataset.tab === name);
-        });
-        document.querySelectorAll('main > section').forEach((section) => {
-            section.classList.toggle('hidden', section.id !== `tab-${name}`);
-        });
-        if (name === 'invoices') loadInvoices();
-        if (name === 'batch') loadExecutions();
-    }
-
-    async function loadCustomers() {
-        state.customers = await api('/api/customers');
-        const select = document.getElementById('customer');
-        select.innerHTML = state.customers
-            .map((customer) => `<option value="${esc(customer.code)}">${esc(customer.code)} — ${esc(customer.name)}</option>`)
-            .join('');
-    }
-
-    async function loadProducts() {
-        state.products = await api('/api/products');
-        document.getElementById('products-body').innerHTML = table(
-            ['コード', '商品名', '単価', '在庫'],
-            state.products.map((product) => [
-                `<span class="mono">${esc(product.code)}</span>`,
-                esc(product.name),
-                `<span class="num">${yen.format(product.unitPrice)}</span>`,
-                `<span class="num">${product.stock}</span>`
-            ])
-        );
-        document.querySelectorAll('.product-select').forEach(renderProductOptions);
-    }
-
-    function renderProductOptions(select) {
-        const current = select.value;
-        select.innerHTML = state.products
-            .map((product) => `<option value="${esc(product.code)}">${esc(product.code)} — ${esc(product.name)} (${yen.format(product.unitPrice)})</option>`)
-            .join('');
-        if (current) select.value = current;
-    }
-
-    function addLineRow() {
-        const container = document.getElementById('lines');
-        const row = document.createElement('div');
-        row.className = 'line-row';
-        row.innerHTML = `
-            <div class="field">
-                <label>商品</label>
-                <select class="product-select"></select>
-            </div>
-            <div class="field" style="max-width:120px">
-                <label>数量</label>
-                <input type="number" class="quantity" value="1" min="1" step="1">
-            </div>
-            <button type="button" class="danger small">削除</button>`;
-        row.querySelector('button').addEventListener('click', () => {
-            if (container.children.length > 1) row.remove();
-        });
-        container.appendChild(row);
-        renderProductOptions(row.querySelector('.product-select'));
-    }
-
-    async function loadOrders() {
-        const orders = await api('/api/orders');
-        document.getElementById('orders-body').innerHTML = orders.length === 0
-            ? '<div class="empty">注文はまだありません。</div>'
-            : table(
-                ['注文番号', '顧客', '注文日', 'ステータス', '金額', '操作'],
-                orders.map((order) => [
-                    `<span class="mono">${esc(order.orderNo)}</span>`,
-                    esc(order.customerName),
-                    esc(order.orderDate),
-                    statusBadge(order.status),
-                    `<span class="num">${yen.format(order.totalAmount)}</span>`,
-                    actions(order)
-                ])
-            );
-    }
-
-    function actions(order) {
-        const buttons = [];
-        if (order.status === 'DRAFT') {
-            buttons.push(`<button class="small" onclick="confirmOrder(${order.id})">確定</button>`);
-        }
-        if (order.status === 'DRAFT' || order.status === 'CONFIRMED') {
-            buttons.push(`<button class="danger small" onclick="cancelOrder(${order.id})">取消</button>`);
-        }
-        return buttons.join(' ') || '<span class="empty">—</span>';
-    }
-
-    async function confirmOrder(id) {
-        try {
-            await api(`/api/orders/${id}/confirm`, { method: 'POST' });
-            toast('注文を確定しました');
-            await Promise.all([loadOrders(), loadProducts()]);
-        } catch (error) {
-            toast(error.message, true);
-        }
-    }
-
-    async function cancelOrder(id) {
-        try {
-            await api(`/api/orders/${id}/cancel`, { method: 'POST' });
-            toast('注文をキャンセルしました');
-            await Promise.all([loadOrders(), loadProducts()]);
-        } catch (error) {
-            toast(error.message, true);
-        }
-    }
-
-    async function createOrder(event) {
-        event.preventDefault();
-        const lines = [...document.querySelectorAll('#lines .line-row')].map((row) => ({
-            productCode: row.querySelector('.product-select').value,
-            quantity: Number(row.querySelector('.quantity').value)
-        }));
-        const body = {
-            customerCode: document.getElementById('customer').value,
-            orderDate: document.getElementById('order-date').value || null,
-            lines
-        };
-        try {
-            const created = await api('/api/orders', { method: 'POST', body: JSON.stringify(body) });
-            toast(`注文を作成しました: ${created.orderNo}`);
-            document.getElementById('lines').innerHTML = '';
-            addLineRow();
-            await loadOrders();
-        } catch (error) {
-            toast(error.message, true);
-        }
-    }
-
-    async function loadInvoices() {
-        const month = document.getElementById('invoice-month').value;
-        const query = month ? `?month=${encodeURIComponent(month)}` : '';
-        const invoices = await api(`/api/invoices${query}`);
-        document.getElementById('invoices-body').innerHTML = invoices.length === 0
-            ? '<div class="empty">請求書はまだありません。バッチタブから生成してください。</div>'
-            : table(
-                ['請求書番号', '顧客', '注文番号', '対象月', '税抜', '税額'],
-                invoices.map((invoice) => [
-                    `<span class="mono">${esc(invoice.invoiceNo)}</span>`,
-                    esc(invoice.customerName),
-                    `<span class="mono">${esc(invoice.orderNo)}</span>`,
-                    esc(invoice.billingMonth),
-                    `<span class="num">${yen.format(invoice.totalAmount)}</span>`,
-                    `<span class="num">${yen.format(invoice.taxAmount)}</span>`
-                ])
-            );
-    }
-
-    async function startInvoiceJob() {
-        const month = document.getElementById('batch-month').value;
-        try {
-            const started = await api(`/api/batch/invoices${month ? `?month=${encodeURIComponent(month)}` : ''}`, { method: 'POST' });
-            toast(`請求書バッチを開始しました (execution ${started.executionId})`);
-            pollExecution(started.executionId);
-            await loadExecutions();
-        } catch (error) {
-            toast(error.message, true);
-        }
-    }
-
-    async function startImportJob() {
-        const inputFile = document.getElementById('import-file').value.trim();
-        try {
-            const started = await api(`/api/batch/imports${inputFile ? `?inputFile=${encodeURIComponent(inputFile)}` : ''}`, { method: 'POST' });
-            toast(`CSV 取込バッチを開始しました (execution ${started.executionId})`);
-            pollExecution(started.executionId);
-            await loadExecutions();
-        } catch (error) {
-            toast(error.message, true);
-        }
-    }
-
-    async function pollExecution(executionId) {
-        clearInterval(state.polling);
-        const box = document.getElementById('exec-box');
-        box.style.display = 'block';
-        let attempts = 0;
-        const tick = async () => {
-            attempts++;
-            try {
-                const execution = await api(`/api/batch/executions/${executionId}`);
-                renderExecution(execution);
-                const done = ['COMPLETED', 'FAILED', 'STOPPED', 'ABANDONED'].includes(execution.status);
-                if (done || attempts > 60) {
-                    clearInterval(state.polling);
-                    if (done) {
-                        toast(`ジョブ ${execution.status}: execution ${execution.executionId}`);
-                        await Promise.all([loadExecutions(), loadOrders(), loadProducts(), loadInvoices()]);
-                    }
-                }
-            } catch (error) {
-                clearInterval(state.polling);
-                toast(error.message, true);
-            }
-        };
-        tick();
-        state.polling = setInterval(tick, 1000);
-    }
-
-    function renderExecution(execution) {
-        const steps = (execution.steps || []).map((step) => `
-            <div class="hint" style="margin:6px 0 0">
-                step <span class="mono">${esc(step.stepName)}</span>:
-                read=${step.readCount}, write=${step.writeCount}, commit=${step.commitCount},
-                rollback=${step.rollbackCount}, skip=${step.skipCount}
-            </div>`).join('');
-        document.getElementById('exec-box').innerHTML = `
-            <div><strong>execution ${execution.executionId}</strong> — ${esc(execution.jobName)} ${statusBadge(execution.status)}</div>
-            <div class="hint" style="margin:4px 0 0">exit=${esc(execution.exitStatus || '—')} / start=${esc(execution.startTime || '—')} / end=${esc(execution.endTime || '—')}</div>
-            ${steps}`;
-    }
-
-    async function loadExecutions() {
-        const executions = await api('/api/batch/executions?count=10');
-        document.getElementById('executions-body').innerHTML = executions.length === 0
-            ? '<div class="empty">ジョブ実行履歴はありません。</div>'
-            : table(
-                ['Execution', 'ジョブ', 'ステータス', '開始', '終了'],
-                executions.map((execution) => [
-                    `<span class="mono">${execution.executionId}</span>`,
-                    esc(execution.jobName),
-                    statusBadge(execution.status),
-                    esc(execution.startTime || '—'),
-                    esc(execution.endTime || '—')
-                ])
-            );
-    }
-
-    function table(headers, rows) {
-        return `<table><thead><tr>${headers.map((header) => `<th>${esc(header)}</th>`).join('')}</tr></thead>
-            <tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-    }
-
-    document.querySelectorAll('nav button').forEach((button) => {
-        button.addEventListener('click', () => switchTab(button.dataset.tab));
-    });
-    document.getElementById('add-line').addEventListener('click', addLineRow);
-    document.getElementById('order-form').addEventListener('submit', createOrder);
-    document.getElementById('invoice-month').addEventListener('change', loadInvoices);
-
-    (async function init() {
-        const month = previousMonth();
-        document.getElementById('invoice-month').value = month;
-        document.getElementById('batch-month').value = month;
-        try {
-            await Promise.all([loadCustomers(), loadProducts(), loadOrders(), loadInvoices(), loadExecutions()]);
-            addLineRow();
-        } catch (error) {
-            toast(`初期化に失敗しました: ${error.message}`, true);
-        }
-    })();
-</script>
+<script src="app.js"></script>
 </body>
 </html>

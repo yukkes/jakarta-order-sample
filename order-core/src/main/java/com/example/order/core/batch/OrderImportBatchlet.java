@@ -1,6 +1,7 @@
 package com.example.order.core.batch;
 
 import com.example.order.core.service.OrderImportService;
+import com.example.order.core.web.error.BusinessException;
 import com.example.order.api.model.CreateOrderLine;
 import com.example.order.api.model.CreateOrderRequest;
 import jakarta.batch.api.BatchProperty;
@@ -19,6 +20,7 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -35,6 +37,9 @@ public class OrderImportBatchlet implements Batchlet {
     private OrderImportService orderImportService;
 
     @Inject
+    private ImportFileResolver importFileResolver;
+
+    @Inject
     @BatchProperty(name = "inputFile")
     private String inputFile;
 
@@ -46,21 +51,24 @@ public class OrderImportBatchlet implements Batchlet {
         int success = 0;
         List<String> errors = new ArrayList<>();
 
-        for (String line : lines) {
+        for (int index = 0; index < lines.size(); index++) {
             if (stopped) {
                 errors.add("stopped by request");
                 break;
             }
-            String trimmed = line.trim();
+            String trimmed = lines.get(index).trim();
             if (trimmed.isEmpty() || trimmed.startsWith("#")) {
                 continue;
             }
+            int lineNumber = index + 1;
             try {
                 importLine(trimmed);
                 success++;
             } catch (RuntimeException exception) {
-                errors.add(trimmed + " -> " + exception.getMessage());
-                LOG.log(Level.WARNING, "import failed: {0}", trimmed);
+                // Never echo the raw line: it is file content, not a message we wrote.
+                errors.add("line " + lineNumber + ": " + describe(exception));
+                LOG.log(Level.WARNING, "import failed at line {0}: {1}",
+                        new Object[] {lineNumber, exception.getClass().getSimpleName()});
             }
         }
 
@@ -73,10 +81,16 @@ public class OrderImportBatchlet implements Batchlet {
         stopped = true;
     }
 
+    private static final class InvalidCsvLineException extends RuntimeException {
+        InvalidCsvLineException(String message) {
+            super(message);
+        }
+    }
+
     private void importLine(String line) {
         String[] columns = line.split(",");
         if (columns.length < 3) {
-            throw new IllegalArgumentException("顧客コード,商品コード,数量 の3列が必要です");
+            throw new InvalidCsvLineException("顧客コード,商品コード,数量 の3列が必要です");
         }
 
         CreateOrderRequest request = new CreateOrderRequest();
@@ -91,13 +105,28 @@ public class OrderImportBatchlet implements Batchlet {
         orderImportService.importOrder(request);
     }
 
+    private String describe(RuntimeException exception) {
+        if (exception instanceof BusinessException) {
+            return exception.getMessage();
+        }
+        if (exception instanceof NumberFormatException) {
+            return "数量が整数ではありません";
+        }
+        if (exception instanceof DateTimeParseException) {
+            return "受注日は YYYY-MM-DD 形式で指定してください";
+        }
+        if (exception instanceof InvalidCsvLineException) {
+            return exception.getMessage();
+        }
+        return "取込に失敗しました (" + exception.getClass().getSimpleName() + ")";
+    }
+
     private List<String> readLines() throws IOException {
         if (inputFile != null && !inputFile.isBlank()) {
-            Path path = Path.of(inputFile);
-            if (Files.exists(path)) {
-                return Files.readAllLines(path, StandardCharsets.UTF_8);
-            }
-            LOG.log(Level.WARNING, "inputFile not found, falling back to classpath: {0}", inputFile);
+            // Checked again here even though BatchService validates before starting:
+            // restart() and direct JobOperator calls bypass the service.
+            Path path = importFileResolver.resolve(inputFile);
+            return Files.readAllLines(path, StandardCharsets.UTF_8);
         }
 
         try (InputStream stream = getClass().getResourceAsStream(CLASSPATH_CSV)) {

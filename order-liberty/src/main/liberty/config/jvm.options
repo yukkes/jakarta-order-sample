@@ -1,0 +1,4 @@
+# Local demo only: seeds the demo accounts admin/admin and user/user.
+# For any shared or production server remove this line and set
+# ORDER_ADMIN_PASSWORD / ORDER_USER_PASSWORD (or -Dorder.admin-password=...) instead.
+-Dorder.demo-users=true

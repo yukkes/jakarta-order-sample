@@ -12,17 +12,29 @@
         <class>com.example.order.domain.Order</class>
         <class>com.example.order.domain.OrderLine</class>
         <class>com.example.order.domain.Invoice</class>
+        <class>com.example.order.domain.User</class>
+        <class>com.example.order.domain.AuthToken</class>
 
         <properties>
-            <!-- Hibernate is used by Quarkus. Open Liberty overrides the provider with EclipseLink. -->
-            <property name="hibernate.dialect" value="org.hibernate.dialect.PostgreSQLDialect"/>
-            <property name="hibernate.show_sql" value="false"/>
-            <property name="hibernate.format_sql" value="false"/>
+            <!-- Demo only: every start drops and recreates the schema, so data is lost.
+                 For production switch both properties to "none" (or "validate") and manage
+                 the schema with Flyway / Liquibase. A runtime cannot override these, because
+                 Quarkus ignores quarkus.hibernate-orm.database.generation when a
+                 persistence.xml is present and WildFly / GlassFish have no equivalent
+                 override for a persistence-unit property. -->
             <property name="jakarta.persistence.schema-generation.database.action" value="drop-and-create"/>
+            <!-- Hibernate (Quarkus) builds its metadata at static init, before a JDBC connection
+                 exists, so it cannot detect the dialect from JDBC metadata. Keep it explicit;
+                 Hibernate 6's auto-detection only works when a URL is configured. -->
+            <property name="hibernate.dialect" value="org.hibernate.dialect.PostgreSQLDialect"/>
             <!-- EclipseLink (Open Liberty / GlassFish) creates the schema at EMF creation,
                  before @Startup beans such as the data seeder run. -->
             <property name="eclipselink.ddl-generation" value="drop-and-create-tables"/>
             <property name="eclipselink.ddl-generation.output-mode" value="database"/>
+            <!-- The demo drops tables on every start. The first drop on an empty database
+                 fails and would log noisy EclipseLink-4002 warnings. Remove this property
+                 when debugging DDL problems. -->
+            <property name="eclipselink.logging.exceptions" value="false"/>
         </properties>
     </persistence-unit>
 </persistence>

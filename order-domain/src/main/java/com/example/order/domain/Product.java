@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 
 import java.math.BigDecimal;
 
@@ -29,6 +30,10 @@ public class Product {
 
     @Column(nullable = false)
     private int stock;
+
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     protected Product() {
     }

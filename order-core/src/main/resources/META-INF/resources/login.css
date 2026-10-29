@@ -1,0 +1,188 @@
+:root {
+    --mui-primary: #1976d2;
+    --mui-primary-dark: #1565c0;
+    --mui-error: #d32f2f;
+    --mui-text-primary: rgba(0, 0, 0, .87);
+    --mui-text-secondary: rgba(0, 0, 0, .6);
+    --mui-divider: rgba(0, 0, 0, .12);
+    --mui-bg: #fafafa;
+    --mui-paper: #fff;
+    --mui-radius: 4px;
+    --elevation-3: 0px 3px 3px -2px rgba(0, 0, 0, .2), 0px 3px 4px 0px rgba(0, 0, 0, .14), 0px 1px 8px 0px rgba(0, 0, 0, .12);
+    --elevation-4: 0px 2px 4px -1px rgba(0, 0, 0, .2), 0px 4px 5px 0px rgba(0, 0, 0, .14), 0px 1px 10px 0px rgba(0, 0, 0, .12);
+}
+* { box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; }
+body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: var(--mui-bg);
+    color: var(--mui-text-primary);
+    font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+    font-size: 1rem;
+    line-height: 1.5;
+    letter-spacing: .00938em;
+}
+.card {
+    width: min(400px, 100%);
+    padding: 40px;
+    border-radius: var(--mui-radius);
+    background: var(--mui-paper);
+    box-shadow: var(--elevation-3);
+}
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+.brand-mark {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    color: var(--mui-primary);
+}
+.brand-mark svg {
+    display: block;
+    height: 34px;
+    width: auto;
+}
+.brand-name {
+    color: var(--mui-text-secondary);
+    font-size: .875rem;
+    letter-spacing: .01071em;
+}
+h1 {
+    margin: 0 0 8px;
+    font-size: 1.5rem;
+    font-weight: 400;
+    line-height: 1.334;
+    letter-spacing: 0em;
+}
+.subtitle {
+    margin: 0 0 28px;
+    color: var(--mui-text-secondary);
+    font-size: .875rem;
+    line-height: 1.43;
+    letter-spacing: .01071em;
+}
+.field {
+    position: relative;
+    margin-top: 20px;
+}
+.field label {
+    position: absolute;
+    top: 50%;
+    left: 14px;
+    z-index: 1;
+    max-width: calc(100% - 28px);
+    padding: 0 4px;
+    background: var(--mui-paper);
+    color: var(--mui-text-secondary);
+    font-size: 1rem;
+    line-height: 1.66;
+    letter-spacing: .00938em;
+    pointer-events: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transform: translateY(-50%);
+    transform-origin: top left;
+    transition: top .15s, left .15s, transform .15s, letter-spacing .15s, color .15s;
+}
+.field:focus-within label,
+.field:has(input:not(:placeholder-shown)) label {
+    top: 0;
+    left: 12px;
+    transform: translateY(-9px) scale(.75);
+    letter-spacing: .03333em;
+}
+/* Password managers can fill fields before any user input; keep the
+   label floated in that case too, without JavaScript. */
+.field:has(input:autofill) label,
+.field:has(input:-webkit-autofill) label {
+    top: 0;
+    left: 12px;
+    transform: translateY(-9px) scale(.75);
+    letter-spacing: .03333em;
+}
+.field:focus-within label { color: var(--mui-primary); }
+input {
+    width: 100%;
+    height: 56px;
+    padding: 16.5px 14px;
+    border: 1px solid rgba(0, 0, 0, .23);
+    border-radius: var(--mui-radius);
+    background: transparent;
+    color: var(--mui-text-primary);
+    font: inherit;
+    font-size: 1rem;
+    letter-spacing: .00938em;
+    transition: border-color .15s, box-shadow .15s;
+}
+input:hover { border-color: rgba(0, 0, 0, .87); }
+input:focus {
+    outline: none;
+    border-color: var(--mui-primary);
+    box-shadow: inset 0 0 0 1px var(--mui-primary);
+}
+/* Keep the MUI surface instead of Chrome's autofill background. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover {
+    -webkit-text-fill-color: var(--mui-text-primary);
+    -webkit-box-shadow: inset 0 0 0 100px var(--mui-paper);
+}
+input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--mui-text-primary);
+    -webkit-box-shadow: inset 0 0 0 100px var(--mui-paper), inset 0 0 0 1px var(--mui-primary);
+}
+button {
+    width: 100%;
+    min-height: 40px;
+    margin-top: 28px;
+    padding: 8px 22px;
+    border: 0;
+    border-radius: var(--mui-radius);
+    background: var(--mui-primary);
+    color: #fff;
+    font: inherit;
+    font-size: .875rem;
+    font-weight: 500;
+    letter-spacing: .02857em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: var(--elevation-3);
+    transition: background .25s, box-shadow .25s;
+}
+button:hover { background: var(--mui-primary-dark); box-shadow: var(--elevation-4); }
+button:disabled {
+    background: rgba(0, 0, 0, .12);
+    color: rgba(0, 0, 0, .26);
+    box-shadow: none;
+    cursor: default;
+}
+.error {
+    display: none;
+    margin-top: 20px;
+    padding: 6px 16px;
+    border-radius: var(--mui-radius);
+    background: #fdeded;
+    color: #5f2120;
+    font-size: .875rem;
+    line-height: 1.43;
+    letter-spacing: .01071em;
+}
+.error.show { display: block; }
+:focus-visible { outline: 2px solid var(--mui-primary); outline-offset: 2px; }
+@media (max-width: 480px) {
+    body { padding: 16px; }
+    .card { padding: 28px 24px; }
+    h1 { font-size: 1.35rem; }
+}
+
+/* Utilities. The UI must not use inline style attributes (CSP: style-src 'self'). */
+[hidden] { display: none !important; }

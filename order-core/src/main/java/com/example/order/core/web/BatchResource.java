@@ -1,5 +1,6 @@
 package com.example.order.core.web;
 
+import com.example.order.core.web.auth.RequireRole;
 import com.example.order.core.service.BatchService;
 import com.example.order.api.model.BatchExecutionResponse;
 import com.example.order.api.model.BatchStartResponse;
@@ -11,18 +12,24 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
 
 import java.net.URI;
 import java.util.List;
 
+@RequireRole("ADMIN")
 @Path("/batch")
-@Produces(MediaType.APPLICATION_JSON)
+@Produces({MediaType.APPLICATION_JSON, "application/problem+json"})
 public class BatchResource {
 
     @Inject
     private BatchService batchService;
+
+    @Context
+    private UriInfo uriInfo;
 
     @POST
     @Path("/invoices")
@@ -65,7 +72,12 @@ public class BatchResource {
     }
 
     private Response accepted(BatchStartResponse started) {
-        return Response.accepted(URI.create("/api/batch/executions/" + started.getExecutionId()))
+        URI location = uriInfo.getBaseUriBuilder()
+                .path("batch")
+                .path("executions")
+                .path(started.getExecutionId().toString())
+                .build();
+        return Response.accepted(location)
                 .entity(started)
                 .build();
     }

@@ -19,7 +19,6 @@ import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -29,7 +28,7 @@ import java.util.List;
         @Index(name = "idx_orders_date", columnList = "order_date"),
         @Index(name = "idx_orders_status", columnList = "status")
 })
-public class Order {
+public class Order extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -51,9 +50,6 @@ public class Order {
 
     @Column(name = "total_amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal totalAmount = BigDecimal.ZERO;
-
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
 
     @Version
     @Column(nullable = false)
@@ -118,10 +114,6 @@ public class Order {
 
     public BigDecimal getTotalAmount() {
         return totalAmount;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
     }
 
     public List<OrderLine> getLines() {

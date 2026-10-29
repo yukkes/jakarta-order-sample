@@ -39,6 +39,7 @@
                             <goal>generate</goal>
                         </goals>
                         <configuration>
+                            <quiet>true</quiet>
                             <inputSpec>${project.basedir}/src/main/openapi/order-api.yaml</inputSpec>
                             <generatorName>jaxrs-spec</generatorName>
                             <output>${project.build.directory}/generated-sources/openapi</output>
@@ -64,6 +65,19 @@
                                 <sourceFolder>src/gen/java</sourceFolder>
                             </configOptions>
                         </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>io.smallrye</groupId>
+                <artifactId>jandex-maven-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <id>make-index</id>
+                        <goals>
+                            <goal>jandex</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>

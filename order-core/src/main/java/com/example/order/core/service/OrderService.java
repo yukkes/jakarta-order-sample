@@ -1,5 +1,8 @@
 package com.example.order.core.service;
 
+import com.example.order.core.event.OrderCancelledEvent;
+import com.example.order.core.event.OrderConfirmedEvent;
+import com.example.order.core.logging.Logged;
 import com.example.order.core.repository.CustomerRepository;
 import com.example.order.core.repository.OrderRepository;
 import com.example.order.core.repository.ProductRepository;
@@ -8,20 +11,24 @@ import com.example.order.api.model.CreateOrderRequest;
 import com.example.order.api.model.OrderLineResponse;
 import com.example.order.api.model.OrderResponse;
 import com.example.order.core.web.error.BusinessException;
+import com.example.order.core.web.paging.PageQuery;
+import com.example.order.core.web.paging.PageResponse;
 import com.example.order.domain.Customer;
 import com.example.order.domain.Order;
 import com.example.order.domain.OrderLine;
 import com.example.order.domain.OrderStatus;
 import com.example.order.domain.Product;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
+import jakarta.persistence.OptimisticLockException;
 import jakarta.transaction.Transactional;
 
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
+@Logged
 @ApplicationScoped
 public class OrderService {
 
@@ -33,6 +40,12 @@ public class OrderService {
 
     @Inject
     private ProductRepository productRepository;
+
+    @Inject
+    private Event<OrderConfirmedEvent> confirmedEvents;
+
+    @Inject
+    private Event<OrderCancelledEvent> cancelledEvents;
 
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) {
@@ -65,12 +78,11 @@ public class OrderService {
                 throw BusinessException.conflict("在庫不足: " + product.getCode()
                         + " (在庫=" + product.getStock() + ", 要求=" + line.getQuantity() + ")");
             }
-        }
-        for (OrderLine line : order.getLines()) {
-            Product product = line.getProduct();
             product.setStock(product.getStock() - line.getQuantity());
         }
         order.setStatus(OrderStatus.CONFIRMED);
+        flushOrConflict();
+        confirmedEvents.fire(new OrderConfirmedEvent(order.getId(), order.getOrderNo()));
         return toResponse(order);
     }
 
@@ -90,6 +102,8 @@ public class OrderService {
             }
         }
         order.setStatus(OrderStatus.CANCELLED);
+        flushOrConflict();
+        cancelledEvents.fire(new OrderCancelledEvent(order.getId(), order.getOrderNo()));
         return toResponse(order);
     }
 
@@ -99,11 +113,11 @@ public class OrderService {
     }
 
     @Transactional
-    public List<OrderResponse> listOrders(String status) {
-        List<Order> orders = status == null || status.isBlank()
-                ? orderRepository.findAll()
-                : orderRepository.findByStatus(parseStatus(status));
-        return orders.stream().map(this::toResponse).toList();
+    public PageResponse<OrderResponse> listOrders(String status, PageQuery page) {
+        OrderStatus parsed = status == null || status.isBlank() ? null : parseStatus(status);
+        var orders = orderRepository.findPage(parsed, page.offset(), page.size(), page.sort());
+        long total = orderRepository.count(parsed);
+        return PageResponse.of(orders.stream().map(this::toResponse).toList(), page, total);
     }
 
     private OrderStatus parseStatus(String status) {
@@ -127,6 +141,14 @@ public class OrderService {
     private Order findOrder(Long id) {
         return orderRepository.findById(id)
                 .orElseThrow(() -> BusinessException.notFound("注文が見つかりません: " + id));
+    }
+
+    private void flushOrConflict() {
+        try {
+            orderRepository.flush();
+        } catch (OptimisticLockException exception) {
+            throw BusinessException.conflict("注文または在庫が更新されました。再試行してください");
+        }
     }
 
     private String newOrderNo() {

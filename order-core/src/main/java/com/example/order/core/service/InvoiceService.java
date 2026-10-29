@@ -3,6 +3,8 @@ package com.example.order.core.service;
 import com.example.order.core.repository.InvoiceRepository;
 import com.example.order.api.model.InvoiceResponse;
 import com.example.order.core.web.error.BusinessException;
+import com.example.order.core.web.paging.PageQuery;
+import com.example.order.core.web.paging.PageResponse;
 import com.example.order.domain.Invoice;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -10,7 +12,6 @@ import jakarta.transaction.Transactional;
 
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
-import java.util.List;
 
 @ApplicationScoped
 public class InvoiceService {
@@ -19,11 +20,11 @@ public class InvoiceService {
     private InvoiceRepository invoiceRepository;
 
     @Transactional
-    public List<InvoiceResponse> listInvoices(String month) {
-        List<Invoice> invoices = month == null || month.isBlank()
-                ? invoiceRepository.findAll()
-                : invoiceRepository.findByMonth(normalizeMonth(month));
-        return invoices.stream().map(this::toResponse).toList();
+    public PageResponse<InvoiceResponse> listInvoices(String month, PageQuery page) {
+        String billingMonth = month == null || month.isBlank() ? null : normalizeMonth(month);
+        var invoices = invoiceRepository.findPage(billingMonth, page.offset(), page.size(), page.sort());
+        long total = invoiceRepository.count(billingMonth);
+        return PageResponse.of(invoices.stream().map(this::toResponse).toList(), page, total);
     }
 
     @Transactional

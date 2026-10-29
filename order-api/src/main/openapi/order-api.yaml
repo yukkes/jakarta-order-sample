@@ -5,7 +5,116 @@ info:
   description: Online order and Jakarta Batch sample API.
 servers:
   - url: /api
+security:
+  - bearerAuth: []
+  - sessionCookie: []
 paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Bearer token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+  /auth/session:
+    post:
+      tags: [Auth]
+      operationId: createSession
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Session cookie issued
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+  /auth/me:
+    get:
+      tags: [Auth]
+      operationId: currentUser
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+  /auth/status:
+    get:
+      tags: [Auth]
+      operationId: authStatus
+      security: []
+      responses:
+        '200':
+          description: Authentication status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthStatusResponse'
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      responses:
+        '204':
+          description: Logged out
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
   /orders:
     get:
       tags: [Orders]
@@ -17,15 +126,16 @@ paths:
           schema:
             type: string
             enum: [DRAFT, CONFIRMED, INVOICED, CANCELLED]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/Sort'
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OrderResponse'
+                $ref: '#/components/schemas/OrderPageResponse'
     post:
       tags: [Orders]
       operationId: createOrder
@@ -48,6 +158,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
   /orders/{id}:
     get:
       tags: [Orders]
@@ -67,6 +180,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
   /orders/{id}/confirm:
     post:
       tags: [Orders]
@@ -86,6 +202,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
   /orders/{id}/cancel:
     post:
       tags: [Orders]
@@ -105,32 +224,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
   /products:
     get:
       tags: [Products]
       operationId: listProducts
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/Sort'
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ProductResponse'
+                $ref: '#/components/schemas/ProductPageResponse'
   /customers:
     get:
       tags: [Customers]
       operationId: listCustomers
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/Sort'
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/CustomerResponse'
+                $ref: '#/components/schemas/CustomerPageResponse'
   /invoices:
     get:
       tags: [Invoices]
@@ -142,15 +268,16 @@ paths:
           schema:
             type: string
             example: '2026-09'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/Sort'
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/InvoiceResponse'
+                $ref: '#/components/schemas/InvoicePageResponse'
   /invoices/{id}:
     get:
       tags: [Invoices]
@@ -170,6 +297,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
   /batch/invoices:
     post:
       tags: [Batch]
@@ -250,6 +380,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
   /batch/executions/{id}/restart:
     post:
       tags: [Batch]
@@ -264,6 +397,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/BatchStartResponse'
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: ORDER_SESSION
   parameters:
     Id:
       name: id
@@ -272,23 +414,111 @@ components:
       schema:
         type: integer
         format: int64
+    Page:
+      name: page
+      in: query
+      required: false
+      description: Zero-based page index.
+      schema:
+        type: integer
+        format: int32
+        default: 0
+        minimum: 0
+    Size:
+      name: size
+      in: query
+      required: false
+      description: Page size. Values above 100 are clamped to 100.
+      schema:
+        type: integer
+        format: int32
+        default: 20
+        minimum: 1
+        maximum: 100
+    Sort:
+      name: sort
+      in: query
+      required: false
+      description: Sort criteria in `field,asc|desc` form. Repeat the parameter for multiple fields.
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+      example: ["status,asc", "id,desc"]
   schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 50
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+          format: password
+    UserResponse:
+      type: object
+      properties:
+        username:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+    AuthStatusResponse:
+      type: object
+      required: [authenticated]
+      properties:
+        authenticated:
+          type: boolean
+        username:
+          type: string
+          nullable: true
+        roles:
+          type: array
+          items:
+            type: string
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+          x-field-extra-annotation: >-
+            @jakarta.json.bind.annotation.JsonbDateFormat("yyyy-MM-dd'T'HH:mm:ss")
+            @com.fasterxml.jackson.annotation.JsonFormat(shape = com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
+        username:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
     CreateOrderLine:
       type: object
       required: [productCode, quantity]
       properties:
         productCode:
           type: string
+          maxLength: 20
         quantity:
           type: integer
           format: int32
           minimum: 1
+          maximum: 10000
     CreateOrderRequest:
       type: object
       required: [customerCode, lines]
       properties:
         customerCode:
           type: string
+          maxLength: 20
         orderDate:
           type: string
           format: date
@@ -298,6 +528,10 @@ components:
         lines:
           type: array
           minItems: 1
+          maxItems: 100
+          # Field-level cascade: container-element @Valid alone is not honoured by every
+          # runtime's JAX-RS validation integration, a field-level @Valid always is.
+          x-field-extra-annotation: '@jakarta.validation.Valid'
           items:
             $ref: '#/components/schemas/CreateOrderLine'
     OrderLineResponse:
@@ -450,6 +684,65 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/StepExecutionResponse'
+    PageMetadata:
+      type: object
+      properties:
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+        first:
+          type: boolean
+        last:
+          type: boolean
+        hasNext:
+          type: boolean
+        hasPrevious:
+          type: boolean
+    OrderPageResponse:
+      allOf:
+        - $ref: '#/components/schemas/PageMetadata'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrderResponse'
+    ProductPageResponse:
+      allOf:
+        - $ref: '#/components/schemas/PageMetadata'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProductResponse'
+    CustomerPageResponse:
+      allOf:
+        - $ref: '#/components/schemas/PageMetadata'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/CustomerResponse'
+    InvoicePageResponse:
+      allOf:
+        - $ref: '#/components/schemas/PageMetadata'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/InvoiceResponse'
     ErrorResponse:
       type: object
       properties:
@@ -459,4 +752,19 @@ components:
         error:
           type: string
         message:
+          type: string
+    ProblemDetail:
+      type: object
+      description: RFC 9457 problem details, returned when the client sends Accept application/problem+json.
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        instance:
           type: string

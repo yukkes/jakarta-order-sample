@@ -5,6 +5,8 @@ Spring Boot を使わず、**Jakarta EE の仕様 API だけ**でオンライン
 ビジネスロジックと Web/Batch の実装は `order-core` に閉じ込め、**Open Liberty / WildFly / GlassFish でも同じコード**が動くようにしてあります。
 
 - 詳細な比較: [docs/runtime-benchmarks.md](docs/runtime-benchmarks.md)
+- Jakarta Data 1.0 の導入検討: [docs/jakarta-data-assessment.md](docs/jakarta-data-assessment.md)
+- Spring Boot との機能差を埋める検討: [docs/spring-parity-assessment.md](docs/spring-parity-assessment.md)
 - `main` は Quarkus をメインに、Open Liberty / WildFly / GlassFish のアダプタも同じリポジトリに含みます
 
 | ディレクトリ | 実行基盤 |
@@ -13,6 +15,12 @@ Spring Boot を使わず、**Jakarta EE の仕様 API だけ**でオンライン
 | `order-liberty` | Open Liberty 26 |
 | `order-wildfly` | WildFly 42 |
 | `order-glassfish` | GlassFish 8 |
+
+## 動作イメージ
+
+ログイン → 商品一覧 → 請求書バッチ実行 → 請求書一覧 → 注文一覧の流れです。
+
+![動作イメージ](docs/images/demo.gif)
 
 ### 実測サマリ
 
@@ -55,13 +63,13 @@ Service は Repository だけを参照し、JPQL や `EntityManager` は Reposit
 Web の DTO は `order-api` の OpenAPI 定義から生成し、`order-core` はその生成物を利用します。
 
 `order-core` は Quarkus に依存せず、Jakarta EE API と `order-api` / `order-domain` にだけ依存しています。
-Quarkus と Liberty の差分は次の 4 点です。
+Quarkus と Liberty の主な差分は次のとおりです（初期データ投入は CDI の `Startup` イベントで共通化しています）。
 
 | 関心事 | Quarkus 側 | Open Liberty 側 |
 |---|---|---|
 | バッチ実行 | `quarkus-jberet`（Jakarta Batch 2.1 実装） | `batch-2.1`（`jakartaee-11.0` に含まれる） |
 | スケジューラ | `quarkus.jberet.job."invoiceJob".cron` | EJB `@Schedule`（`InvoiceSchedule`） |
-| 初期データ投入 | `StartupEvent` オブザーバ（`QuarkusDataSeeder`） | EJB `@Startup` + `@PostConstruct`（`LibertyDataSeeder`） |
+| 初期データ投入 | CDI `Startup` イベント（`StartupDataSeeder`、共通） | 同左 |
 | EntityManager の注入 | Quarkus の組み込み Bean | Liberty の JPA コンテナが提供する CDI Bean |
 
 ## 動作環境
@@ -140,13 +148,20 @@ mvn -pl order-quarkus -Pembedded-postgres test-compile exec:java
 
 ```bash
 mvn clean package
-java -jar order-quarkus/target/quarkus-app/quarkus-run.jar
+java -Dorder.demo-users=true -jar order-quarkus/target/quarkus-app/quarkus-run.jar
 ```
 
-- 画面: <http://localhost:8080/>
+`-Dorder.demo-users=true`（環境変数なら `ORDER_DEMO_USERS=true`）はデモユーザーを作るためのローカル専用の設定です。
+
+- 画面: <http://localhost:8080/>（ログイン、注文のステータス絞り込み、注文・商品・請求書のページング / ソート、バッチ実行に対応）
+- UI は MUI のデフォルトテーマ（Roboto / `#1976d2` / 4px 角丸 / Elevation）に準拠し、モバイルではテーブルを横スクロール
+- アイコンは Font Awesome Free 6.7.2 の `file-circle-check` をインライン SVG で使用（ヘッダー / ログイン / favicon 共通、CC BY 4.0）
+- Lighthouse（mobile / desktop、ログイン / ダッシュボード）: Performance / Accessibility / Best Practices / SEO すべて 100
+- ログイン画面: <http://localhost:8080/login.html>
 - API: <http://localhost:8080/api/products>
 - DB: `jdbc:postgresql://localhost:5432/orders`
-- 初回起動時に顧客 3 件、商品 4 件、前月の確定注文 3 件、当月の DRAFT 注文 1 件を投入します。
+- 初回起動時に顧客 3 件、商品 4 件、前月の確定注文 3 件、当月の DRAFT 注文 1 件を投入します。ユーザーは下記「初期ユーザー」の設定に従って作成します。
+
 
 開発モードで動かす場合:
 
@@ -157,12 +172,71 @@ mvn -pl order-quarkus quarkus:dev
 
 > `order-quarkus` は `order-core` / `order-domain` を JAR 依存として参照します。リアクタ経由で `quarkus:dev` を実行すると依存 JAR が見つからないことがあるため、先に `mvn install` してください。
 
+## ログイン / 認証
+
+- 初期ユーザーは `app_users` が空のときだけ作成し、パスワードはシステムプロパティか環境変数で渡します
+
+| 設定（システムプロパティ / 環境変数） | 内容 |
+|---|---|
+| `order.admin-password` / `ORDER_ADMIN_PASSWORD` | `admin`（`ADMIN`）をこのパスワードで作成 |
+| `order.user-password` / `ORDER_USER_PASSWORD` | `user`（`USER`）をこのパスワードで作成 |
+| `order.demo-users=true` / `ORDER_DEMO_USERS=true` | パスワード未指定のユーザーを `admin` / `admin`、`user` / `user` で作成（ローカル専用） |
+
+  DB の接続情報も環境変数で上書きできます（既定値はローカル開発用）。
+  Quarkus は `application.properties` の `${DB_USER:orders}` 形式、Liberty は `server.xml` の `<variable>` で参照します。
+  WildFly / GlassFish の設定手順は `docs/runtime-setup.md` を参照してください。
+
+| 環境変数 | 既定値 | 内容 |
+|---|---|---|
+| `DB_URL` | `jdbc:postgresql://localhost:5432/orders` | JDBC URL |
+| `DB_USER` | `orders` | DB ユーザー |
+| `DB_PASSWORD` | `orders` | DB パスワード（`docker compose` も同じ変数を使います） |
+
+  どれも設定しないとユーザーは作成されず、ログインできません（起動ログに WARNING が出ます）。
+  `quarkus:dev`、Quarkus のテスト、Liberty（`src/main/liberty/config/jvm.options`）では `order.demo-users=true` を設定済みです。
+  `scripts/smoke-test.sh` は `user` / `user` でログインするため、デモユーザーを有効にしたサーバーに対して実行してください。
+- ブラウザは `/api/auth/session` で `ORDER_SESSION`（`HttpOnly`）と `XSRF-TOKEN` Cookie を受け取ります
+- SPA の初期化は公開の `/api/auth/status` で認証状態を確認します
+- 直接 API は `/api/auth/login` で Bearer トークンを取得します
+- 注文・商品・顧客・請求書は `USER` / `ADMIN`、バッチは `ADMIN` のみ利用できます
+- 認可は「拒否がデフォルト」です。リソースメソッド（またはクラス）に `@RequireRole`・`@PublicEndpoint`・`@OptionalAuth`
+  のどれも付いていなければ 403 になります。公開しているのは `login`・`session`（`@PublicEndpoint`）と `status`（`@OptionalAuth`）だけです
+- Cookie 認証の POST / PUT / PATCH / DELETE には `X-XSRF-TOKEN` ヘッダーが必要です。Bearer 認証では不要です
+- パスワードは PBKDF2-HMAC-SHA256（600,000 回、JDK 標準）で `$pbkdf2-sha256$i=…$<salt>$<hash>` 形式で保存します。
+  反復回数を変えると、次回ログイン時に新しい回数で再ハッシュされます
+- 同じアカウントで 5 回続けてログインに失敗すると、15 分間ロックします。ロック中・存在しないユーザー・パスワード誤りは
+  すべて同じ 401 を返します。第三者がわざと失敗して他人をロックできるため、ロック時間は短めにしています。
+  IP 単位の制限はリバースプロキシや WAF で行ってください
+- セッションは絶対期限 8 時間に加えて、30 分間アクセスがないと失効します（アイドルタイムアウト）。
+  同時に保持できるのは 1 ユーザー 10 セッションまでで、11 個目にログインすると最も古いセッションが失効します
+- 認可は JAX-RS Filter + `@RequireRole` で行います。GlassFish で `@RolesAllowed` を JAX-RS リソースに付けると
+  コンテナ認証が起動し、`/api/auth/login` まで 401 になるためです
+
+```bash
+# 直接 API 用の Bearer トークン
+TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"user","password":"user"}' | jq -r .token)
+
+curl -s -H "Authorization: Bearer $TOKEN" \
+  'http://localhost:8080/api/orders?page=0&size=10&sort=id,desc'
+
+# ブラウザ用セッション（Cookie が返る）
+curl -i -c cookies.txt -X POST http://localhost:8080/api/auth/session \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"user","password":"user"}'
+```
+
+- 401: 未認証 / トークン無効・期限切れ
+- 403: ロール不足 / CSRF トークン不正
+- `Accept: application/problem+json` を指定すると、認証エラーも RFC 9457 形式になります
+
 ## オンライン API の例
 
 ```bash
-# 商品・顧客
-curl -s http://localhost:8080/api/products
-curl -s http://localhost:8080/api/customers
+# 商品・顧客（ページング）
+curl -s 'http://localhost:8080/api/products?page=0&size=2'
+curl -s 'http://localhost:8080/api/customers?page=0&size=2'
 
 # 注文作成（DRAFT）
 curl -s -X POST http://localhost:8080/api/orders \
@@ -182,8 +256,51 @@ curl -s -X POST http://localhost:8080/api/orders/5/confirm
 curl -s -X POST http://localhost:8080/api/orders/5/cancel
 ```
 
-エラーは `{"status":409,"error":"BUSINESS_ERROR","message":"..."}` の形で返します。
+一覧 API（`/api/orders`、`/api/products`、`/api/customers`、`/api/invoices`）は
+`PageQuery` / `PageResponse` レコードでページングします。
+
+```bash
+curl -s 'http://localhost:8080/api/orders?page=0&size=10'
+```
+
+```json
+{
+  "content": [],
+  "page": 0,
+  "size": 10,
+  "totalElements": 4,
+  "totalPages": 1,
+  "first": true,
+  "last": true,
+  "hasNext": false,
+  "hasPrevious": false
+}
+```
+
+`page` は 0 始まり、`size` は 1〜100 です。範囲外の値はクランプされ、省略時は `page=0` / `size=20` になります。
+
+`sort=field,asc|desc` でソートできます。複数項目を指定する場合は `sort` を繰り返します。
+
+```bash
+curl -s 'http://localhost:8080/api/products?page=0&size=2&sort=stock,desc'
+curl -s 'http://localhost:8080/api/orders?sort=status,asc&sort=id,desc'
+```
+
+ソート項目はエンドポイントごとにホワイトリスト化されています。
+
+- 注文: `id` / `orderNo` / `orderDate` / `status` / `totalAmount` / `createdAt` / `updatedAt`
+- 商品: `code` / `name` / `unitPrice` / `stock`
+- 顧客: `code` / `name`
+- 請求書: `id` / `invoiceNo` / `billingMonth` / `totalAmount` / `taxAmount` / `createdAt` / `updatedAt`
+
+許可されていない項目や不正な方向を指定した場合は 400 を返します。
+
+エラーは既定で `{"status":409,"error":"BUSINESS_ERROR","message":"..."}` の形で返します。
+`Accept: application/problem+json` を指定すると RFC 9457 の Problem Details を返します。
 `@Valid` による入力チェックは 400、存在しない注文・顧客は 404、状態遷移や在庫不足は 409 です。
+不正な JSON は 400、存在しないパスは 404、許可されていないメソッドは 405 で、どれも同じ JSON 形式です。
+想定外の例外は `UnhandledExceptionMapper` が `{"error":"INTERNAL_ERROR","message":"内部エラーが発生しました (errorId=…)"}` の
+500 にし、例外の詳細は同じ `errorId` でサーバーログにだけ出します（スタックトレースやサーバーのバージョンは返しません）。
 
 ## バッチ
 
@@ -221,11 +338,14 @@ cat data/import-report.txt
 ```
 
 - 1 行ごとに `REQUIRES_NEW` のトランザクションで処理するため、1 行の失敗が全体を巻き戻さない
-- 成功/失敗件数とエラー内容を `data/import-report.txt` に出力
-- `inputFile` ジョブパラメータで外部ファイルも指定可能
+- 成功/失敗件数と、失敗した行番号・理由を `data/import-report.txt` に出力（行の内容そのものは出力しない）
+- `inputFile` ジョブパラメータで、取込ディレクトリ（既定 `data/import/`、`ORDER_IMPORT_DIR` /
+  `-Dorder.import-dir` で変更可）に置いた CSV を指定可能。指定できるのは英数字・`.`・`_`・`-` だけからなる
+  `.csv` のファイル名だけで、パスやシンボリックリンクでディレクトリの外は読めない
 
 ```bash
-curl -s -X POST 'http://localhost:8080/api/batch/imports?inputFile=/tmp/orders.csv'
+mkdir -p data/import && cp /tmp/orders.csv data/import/
+curl -s -X POST 'http://localhost:8080/api/batch/imports?inputFile=orders.csv'
 ```
 
 ### 3. 実行履歴・再実行
@@ -273,6 +393,7 @@ order-api/target/generated-sources/openapi/src/gen/java/com/example/order/api/mo
 - `dateLibrary=java8-localdatetime` で `LocalDate` / `LocalDateTime`
 - `useSwaggerAnnotations=false` / `openApiNullable=false` で余計なアノテーションを抑制
 - 生成モデルは Jackson アノテーションを付けますが、実行時は JSON-B が使うため無視されます（`jackson-annotations` はコンパイル用）
+- `order-api/pom.xml` の `<quiet>true</quiet>` で OpenAPI Generator の donate バナーを抑制しています
 - Entity は OpenAPI から生成せず、`order-domain` の JPA エンティティを別に維持
 
 JAX-RS インターフェースも生成する場合は、`generateApis` を `true` に変更し、生成された `OrdersApi` などを Resource クラスで `implements` します。
@@ -296,8 +417,14 @@ Quarkus は `quarkus-smallrye-openapi`、Liberty は `mpOpenAPI-4.0` フィー�
 mvn test
 ```
 
-- `OrderApiTest`: 注文作成 → 確定 → 在庫減 → キャンセル → 在庫戻し、入力チェック、404
+- `OrderApiTest`: 注文作成 → 確定 → 在庫減 → キャンセル → 在庫戻し、入力チェック、404、同一商品の複数行による在庫超過、`Location` ヘッダ
 - `BatchJobTest`: 請求書チャンクジョブ、CSV バッチレットを実際に起動して完了まで待機
+
+起動後のスモークテスト:
+
+```bash
+./scripts/smoke-test.sh http://localhost:8080
+```
 
 テストは **`io.zonky.test:embedded-postgres`** で PostgreSQL 17.11 のネイティブバイナリを
 Maven 経由で取得し、テスト用に起動します。**Docker は不要**です。
@@ -355,12 +482,28 @@ PostgreSQL のバイナリバージョンは親 POM の `embedded-postgres-binar
 
 - `jakartaee-11.0` で JAX-RS / CDI / JPA / Bean Validation / Batch / JSON-B / EJB を有効化
 - `jpa defaultJtaDataSourceJndiName="jdbc/orderDB"` で、`persistence.xml` に `jta-data-source` を書かずに済ませる
-- PostgreSQL は `jdbcDriver` + `library` で参照
+- PostgreSQL は `jdbcDriver` + `library` で参照（接続情報は `DB_URL` / `DB_USER` / `DB_PASSWORD` の `<variable>`）
 - `ibm-web-ext.xml` でコンテキストルートを `/` にし、Quarkus と同じ `/api/...` でアクセス
-- `appSecurity` 有効時の Batch 用に `batchSubmitter` / `batchMonitor` を `EVERYONE` に設定
-- ORB の警告を避けるため `basicRegistry` を定義
+- バッチはアプリが未認証の主体として `JobOperator` を呼ぶため、`batchSubmitter` / `batchMonitor` を `EVERYONE` に設定。
+  `batchAdmin`（他ユーザーのジョブ管理）は使わないので定義しない
+- EJB コンテナの ORB がユーザーレジストリを要求するため、**ユーザーなしの** `basicRegistry` を定義
+  （コンテナ側の `admin/admin` は持たない。認証はアプリのトークンで行う）
+- `localConnector-1.0` はアプリからもドキュメントからも使わないため有効化しない
 
 > `main` の Open Liberty アダプタは、Open Liberty 26.0.0.10 で **API・バッチ・OpenAPI の起動確認済み**です。Quarkus 版と同じ `order-core` / 生成 DTO / ジョブ XML を使っています。
+
+### WildFly / GlassFish の datasource
+
+`persistence.xml` は `jta-data-source` を指定せず、コンテナのデフォルト datasource を使う構成です。
+WildFly / GlassFish では PostgreSQL をデフォルト datasource に向ける必要があります。
+具体的な `jboss-cli` / `asadmin` の例は [docs/runtime-setup.md](docs/runtime-setup.md) を参照してください。
+
+- **WildFly**: JDBC ドライバをモジュールとして追加し、`ee` サブシステムの `default-bindings` の datasource を変更
+- **GlassFish**: JDBC ドライバを domain の `lib` に置き、`jdbc/__default` の pool を PostgreSQL に変更
+- **GlassFish**: `order-glassfish/src/main/webapp/WEB-INF/glassfish-web.xml` で context root を `/` に設定済み
+
+Quarkus / Open Liberty / WildFly / GlassFish の4ランタイムで、起動・一覧 API・注文の作成/確定/キャンセル・請求書バッチ・CSV 取込を確認済みです（[docs/runtime-setup.md](docs/runtime-setup.md)）。
+自動テストが動くのは現状 Quarkus のみです。
 
 ### 実測比較
 
@@ -410,10 +553,12 @@ Spring の `@Repository` に相当する層を `com.example.order.core.repositor
 
 ### スケジューラと初期データ
 
-スケジューラと初期データ投入は実行基盤のライフサイクルに依存するため、コアには置かずアダプタに分離しています。
+スケジューラは実行基盤のライフサイクルに依存するため、コアには置かずアダプタに分離しています。
 
-- Quarkus: `StartupEvent` / JBeret cron
-- Liberty: EJB `@Startup` / `@Schedule`
+- Quarkus: JBeret cron
+- Liberty / WildFly / GlassFish: EJB `@Schedule`
+
+初期データ投入は CDI 4.1 の `Startup` イベント（`StartupDataSeeder`）で共通化しています。
 
 ### 永続化
 
@@ -421,16 +566,42 @@ Spring の `@Repository` に相当する層を `com.example.order.core.repositor
 
 - Quarkus は Hibernate ORM、Liberty は EclipseLink
 - エンティティは JPA 標準アノテーションのみ
-- スキーマ生成は標準の `jakarta.persistence.schema-generation.database.action=drop-and-create`
-- 本番では `none` にして Flyway/Liquibase などに置き換えてください
+- スキーマ生成は標準の `jakarta.persistence.schema-generation.database.action=drop-and-create`（デモ専用）
+  - Quarkus は persistence.xml があると `quarkus.hibernate-orm.*` を使わないため、ランタイム側へは移せません
+  - 本番では `none` にして Flyway/Liquibase などに置き換えてください
+- `hibernate.dialect` だけは Hibernate 用に明示しています。Quarkus は静的初期化時にメタデータを組み立てるため、
+  JDBC 接続なしでは方言を自動検出できないためです
 - DB は PostgreSQL 17（ローカルは Docker Compose または Embedded PostgreSQL、テストは Embedded PostgreSQL）
+
+### Jakarta Data 1.0
+
+現時点では導入していません。Jakarta Data 1.0 は stateless 専用で、現在の managed entity + JPQL の
+Repository とは意味論が異なること、Hibernate の生成実装を `order-core` に置くと Liberty / GlassFish で
+動かなくなることから、導入する場合の選択肢と判定基準を
+[docs/jakarta-data-assessment.md](docs/jakarta-data-assessment.md) にまとめています。
+
+### Spring Boot との機能差
+
+Spring Boot の AutoConfiguration / Starter / DevTools は Jakarta EE の仕様だけでは再現できませんが、
+CDI Startup イベント、JPA 監査、CDI トランザクションイベント、CDI インターセプタ、MP Health などで
+プログラミングモデルと運用機能は近づけられます。優先度と基盤ごとの差は
+[docs/spring-parity-assessment.md](docs/spring-parity-assessment.md) にまとめています。
 
 ### 既知の制約
 
 - 起動のたびに `drop-and-create` でテーブルを作り直すため、オンラインの注文データは消えます（デモ用）
+- 一覧 API は `PageResponse`（`content` / `page` / `size` / `totalElements` など）を返します。旧来の配列レスポンスとは互換性がありません
+- CDI `Startup` イベントによる初期データ投入は 4 基盤で確認済みです。WildFly / GlassFish の CSV 取込は、サーバーの作業ディレクトリ配下に書き込み可能な `data` ディレクトリが必要です
 - CSV 取込は再実行すると同じ注文を再度作成します（重複排除は未実装）
-- 認証・認可、JMS、JTA の XA は含めていません
+- 認証はアプリ発行の opaque token（Cookie / Bearer）です。Jakarta Security / OIDC ではありません
+- デモユーザー（`order.demo-users=true`）は固定パスワードです。本番では有効にせず、`order.admin-password` などで初期パスワードを渡したうえで、IdP / MFA / パスワードリセットを検討してください
+- Cookie の `Secure` 属性は `order.cookie-secure`（`ORDER_COOKIE_SECURE`）で決めます。既定の `auto` は HTTPS のときだけ付与し、
+  本番では `always` を推奨します。TLS 終端プロキシの背後では、プロキシが `X-Forwarded-Proto` を必ず上書きする構成にしたうえで
+  `order.trust-forwarded-proto=true` を設定してください（未設定ならクライアントが送ったこのヘッダーは無視します）
+- CORS は設定していません（画面は同一オリジン想定）。別オリジンの SPA から呼ぶ場合はアダプタ側で設定してください
+- JMS、JTA の XA は含めていません
 - Quarkus JBeret は Quarkiverse のコミュニティ拡張です。本番利用時はサポート状況を確認してください
+- WildFly / GlassFish はコンテナ側の PostgreSQL datasource 設定が必要です。自動テストは Quarkus のみです
 - Embedded PostgreSQL は非 root ユーザーで実行する必要があります（CI のコンテナで root の場合に注意）
 
 ## Spring Boot との対応（参考）
@@ -444,4 +615,14 @@ Spring の `@Repository` に相当する層を `com.example.order.core.repositor
 | `@Scheduled` | Quarkus: JBeret cron / Liberty: EJB `@Schedule` |
 | `@Transactional` | `jakarta.transaction.Transactional` |
 | Bean Validation | `jakarta.validation` |
+| `ApplicationRunner` | CDI `Startup` イベント（`StartupDataSeeder`） |
+| `@TransactionalEventListener` | CDI トランザクションイベント（`OrderAuditListener`） |
+| `@Aspect` | CDI Interceptor（`@Logged`） |
+| `@CreatedDate` / `@LastModifiedDate` | JPA `@PrePersist` / `@PreUpdate`（`Auditable`） |
+| `Pageable` / `Page` | `PageQuery` / `PageResponse` レコード（`sort` 対応） |
+| Spring Security / `@PreAuthorize` | JAX-RS Filter + `@RequireRole`（`RoleAuthorizationFilter`） |
+| `ProblemDetail` | RFC 9457（`Accept: application/problem+json`） |
 | fat jar | Quarkus fast-jar / Liberty WAR |
+
+Jakarta / MicroProfile 標準でどこまで Spring Boot に近づけるかの詳細は
+[docs/spring-parity-assessment.md](docs/spring-parity-assessment.md) を参照してください。

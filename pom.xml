@@ -28,7 +28,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-        <quarkus.platform.version>3.40.1</quarkus.platform.version>
+        <quarkus.platform.version>3.40.1.1</quarkus.platform.version>
         <quarkus-jberet.version>2.11.0</quarkus-jberet.version>
         <jakartaee.version>11.0.0</jakartaee.version>
         <!-- The portable modules compile against the individual spec APIs instead of the
@@ -46,17 +46,17 @@
         <jakarta.ws-rs-api.version>4.0.0</jakarta.ws-rs-api.version>
         <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
         <!-- JDBC driver copied into the Liberty server (and documented for WildFly/GlassFish). -->
-        <postgresql.version>42.7.13</postgresql.version>
+        <postgresql.version>42.7.14</postgresql.version>
 
         <!-- Plugin versions. Configured once here, never repeated in a module. -->
         <openapi-generator-plugin.version>7.26.0</openapi-generator-plugin.version>
-        <jandex-plugin.version>3.3.0</jandex-plugin.version>
+        <jandex-plugin.version>3.6.0</jandex-plugin.version>
         <build-helper-plugin.version>3.6.2</build-helper-plugin.version>
         <exec-plugin.version>3.6.4</exec-plugin.version>
         <liberty-maven-plugin.version>3.12.4</liberty-maven-plugin.version>
-        <wildfly-maven-plugin.version>5.1.2.Final</wildfly-maven-plugin.version>
+        <wildfly-maven-plugin.version>6.1.0.Final</wildfly-maven-plugin.version>
         <embedded-postgres.version>2.2.2</embedded-postgres.version>
-        <embedded-postgres.binaries.version>17.11.0</embedded-postgres.binaries.version>
+        <embedded-postgres.binaries.version>18.6.0</embedded-postgres.binaries.version>
     </properties>
 
     <dependencyManagement>
@@ -171,22 +171,22 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.13.0</version>
+                    <version>3.16.0</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
-                    <version>3.5.2</version>
+                    <version>3.6.1</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-war-plugin</artifactId>
-                    <version>3.4.0</version>
+                    <version>3.5.1</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-dependency-plugin</artifactId>
-                    <version>3.10.0</version>
+                    <version>3.11.0</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>

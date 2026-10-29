@@ -1,8 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <server description="Jakarta EE order sample on Open Liberty">
 
+    <!-- Only the features this application uses. `jakartaee-11.0` pulls in JSF, JSP, Mail,
+         Connectors, Messaging and full EJB, which roughly doubles startup time. -->
     <featureManager>
-        <feature>jakartaee-11.0</feature>
+        <feature>servlet-6.1</feature>
+        <feature>restfulWS-4.0</feature>
+        <feature>cdi-4.1</feature>
+        <feature>persistence-3.2</feature>
+        <feature>persistenceContainer-3.2</feature>
+        <feature>jdbc-4.3</feature>
+        <feature>jsonb-3.0</feature>
+        <feature>jsonp-2.1</feature>
+        <feature>validation-3.1</feature>
+        <feature>batch-2.1</feature>
+        <feature>enterpriseBeansLite-4.0</feature>
+        <feature>appSecurity-6.0</feature>
         <feature>mpOpenAPI-4.0</feature>
     </featureManager>
 
@@ -41,10 +54,12 @@
 
     <jdbcDriver id="postgresDriver" libraryRef="postgresLib"/>
 
-    <dataSource id="orderDataSource" jndiName="jdbc/orderDB" jdbcDriverRef="postgresDriver">
+    <dataSource id="orderDataSource" jndiName="jdbc/orderDB" jdbcDriverRef="postgresDriver" statementCacheSize="100">
         <properties URL="${DB_URL}"
                     user="${DB_USER}"
                     password="${DB_PASSWORD}"/>
+        <!-- The default pool (50) becomes the throughput ceiling under concurrency. -->
+        <connectionManager maxPoolSize="100" minPoolSize="10"/>
     </dataSource>
 
     <application location="order-sample.war"/>

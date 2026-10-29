@@ -7,6 +7,7 @@ import jakarta.json.JsonObject;
 import jakarta.json.JsonReader;
 import jakarta.json.JsonString;
 import jakarta.json.JsonValue;
+import jakarta.json.spi.JsonProvider;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -41,6 +42,12 @@ public class TokenService {
      */
     private final ThreadLocal<Mac> macs = new ThreadLocal<>();
 
+    /**
+     * {@code Json.createXxx} resolves the provider through a service lookup on every call
+     * on some runtimes, which dominates per-request verification. Resolve it once.
+     */
+    private volatile JsonProvider jsonProvider;
+
     /** Opaque random value, used as the refresh token. */
     public String newToken() {
         return randomToken(32);
@@ -68,14 +75,14 @@ public class TokenService {
      */
     public String accessToken(byte[] secret, long userId, String username, Set<String> roles,
                               long sessionId, String csrfToken, Instant issuedAt, Instant expiresAt) {
-        JsonObject header = Json.createObjectBuilder()
+        JsonObject header = jsonProvider().createObjectBuilder()
                 .add("alg", "HS256")
                 .add("typ", "JWT")
                 .build();
-        JsonObject claims = Json.createObjectBuilder()
+        JsonObject claims = jsonProvider().createObjectBuilder()
                 .add("sub", userId)
                 .add("name", username)
-                .add("roles", Json.createArrayBuilder(roles))
+                .add("roles", jsonProvider().createArrayBuilder(roles))
                 .add("sid", sessionId)
                 .add("csrf", csrfToken)
                 .add("iat", issuedAt.getEpochSecond())
@@ -140,7 +147,7 @@ public class TokenService {
 
     private JsonObject json(String encoded) {
         String value = new String(BASE64_DECODER.decode(encoded), StandardCharsets.UTF_8);
-        try (JsonReader reader = Json.createReader(new StringReader(value))) {
+        try (JsonReader reader = jsonProvider().createReader(new StringReader(value))) {
             return reader.readObject();
         }
     }
@@ -171,6 +178,20 @@ public class TokenService {
         byte[] value = new byte[bytes];
         random().nextBytes(value);
         return BASE64.encodeToString(value);
+    }
+
+    private JsonProvider jsonProvider() {
+        JsonProvider value = jsonProvider;
+        if (value == null) {
+            synchronized (this) {
+                value = jsonProvider;
+                if (value == null) {
+                    value = JsonProvider.provider();
+                    jsonProvider = value;
+                }
+            }
+        }
+        return value;
     }
 
     private SecureRandom random() {

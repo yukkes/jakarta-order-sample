@@ -24,16 +24,27 @@ Spring Boot を使わず、**Jakarta EE の仕様 API だけ**でオンライン
 
 ### 実測サマリ
 
-| ランタイム | 起動時間 | c=100 スループット | 負荷後 RSS |
-|---|---:|---:|---:|
-| **Quarkus** | **2.65 秒** | **18,200 req/s** | **660 MB** |
-| Open Liberty | 7.68 秒 | 8,700 req/s | 821 MB |
-| WildFly 42 | 6.42 秒 | 8,000 req/s | 755 MB |
-| GlassFish 8 | 9.73 秒 | 6,600 req/s | 675 MB |
+同一の core を 4 基盤 + native で動かし、**各ランタイムの最良設定**（プール 100、WildFly は Jackson）で
+`wrk -t4 -c100 -d10s` を測定（ウォームアップ後、3 回の中央値）。認証は JWT。
 
-測定条件・p99・メモリ内訳は [docs/runtime-benchmarks.md](docs/runtime-benchmarks.md) を参照してください。
+| ランタイム | 起動 | 起動直後 RSS | status（認証なし） | me（認証のみ） | products（認証 + DB） |
+|---|---:|---:|---:|---:|---:|
+| **Quarkus 3.40（JVM）** | 3.45 秒 | 277 MB | **180,032** | **149,534** | **16,921** |
+| **Quarkus 3.40（native）** | **1.18 秒** | **137 MB** | 85,811 | 69,535 | 10,218 |
+| Open Liberty 26（feature 最小） | **5.73 秒** | 640 MB | 53,916 | 58,012 | 12,634 |
+| WildFly 42（Jackson / slim） | **6.53 秒** | 592 MB | 68,605 | 63,147 | 13,194 |
+| GlassFish 8 | 11.14 秒 | 573 MB | 31,884 | 26,675 | 3,509 |
 
-> 16 vCPU、コア固定なし、DB 初期化、3回の中央値です。`ab` は約 0.5 コアで、クライアントはボトルネックではありません。
+- **JSON-P のプロバイダを 1 回だけ解決**するようにして、JWT 検証のコストを削減（`me` が 12k → 149k）
+- **HTTP/JSON 層は Quarkus（JVM）が最速**（status 180k）。native は 86k で、小さな JSON では JIT が勝る
+- **DB を含む products も Quarkus が最速**（16.9k）。WildFly 13.2k、Liberty 12.6k、GlassFish 3.5k
+- **native は起動 1.18 秒・137 MB** で JVM の 3.45 秒・277 MB より優位。スループットは JVM より低い
+- 起動は Liberty **12.28 → 5.73 秒**（必要 feature だけに）、WildFly **7.17 → 6.53 秒**（Galleon で slim 化）
+- **native では Jakarta Batch が動作しません**（`QuarkusJobRepository` で例外→停止）。API と画面は動作します
+- 以前の 18,200 req/s などの数値は `ab` 測定で、20k 付近からクライアントがボトルネックでした。詳細は
+  [docs/runtime-benchmarks.md](docs/runtime-benchmarks.md) を参照してください
+
+> 16 vCPU、コア固定なし、DB 初期化、3 回の中央値です。`wrk -t4 -c100` を使用しています。
 
 ## 構成
 
@@ -67,7 +78,7 @@ Quarkus と Liberty の主な差分は次のとおりです（初期データ投
 
 | 関心事 | Quarkus 側 | Open Liberty 側 |
 |---|---|---|
-| バッチ実行 | `quarkus-jberet`（Jakarta Batch 2.1 実装） | `batch-2.1`（`jakartaee-11.0` に含まれる） |
+| バッチ実行 | `quarkus-jberet`（Jakarta Batch 2.1 実装） | `batch-2.1` |
 | スケジューラ | `quarkus.jberet.job."invoiceJob".cron` | EJB `@Schedule`（`InvoiceSchedule`） |
 | 初期データ投入 | CDI `Startup` イベント（`StartupDataSeeder`、共通） | 同左 |
 | EntityManager の注入 | Quarkus の組み込み Bean | Liberty の JPA コンテナが提供する CDI Bean |
@@ -492,7 +503,8 @@ PostgreSQL のバイナリバージョンは親 POM の `embedded-postgres-binar
 
 `server.xml` のポイント:
 
-- `jakartaee-11.0` で JAX-RS / CDI / JPA / Bean Validation / Batch / JSON-B / EJB を有効化
+- `jakartaee-11.0` ではなく、**このアプリが使う feature だけ**を列挙（`restfulWS-4.0` / `cdi-4.1` / `persistence-3.2` /
+  `batch-2.1` / `enterpriseBeansLite-4.0` など）。起動時間が約半分になる
 - `jpa defaultJtaDataSourceJndiName="jdbc/orderDB"` で、`persistence.xml` に `jta-data-source` を書かずに済ませる
 - PostgreSQL は `jdbcDriver` + `library` で参照（接続情報は `DB_URL` / `DB_USER` / `DB_PASSWORD` の `<variable>`）
 - `ibm-web-ext.xml` でコンテキストルートを `/` にし、Quarkus と同じ `/api/...` でアクセス

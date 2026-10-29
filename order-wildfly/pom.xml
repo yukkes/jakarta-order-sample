@@ -39,4 +39,54 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <!-- Slim, Galleon-provisioned server: only the layers this application needs.
+             `mvn -pl order-wildfly -Pslim package` writes target/server, which starts
+             about twice as fast as the full WildFly distribution. -->
+        <profile>
+            <id>slim</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.wildfly.plugins</groupId>
+                        <artifactId>wildfly-maven-plugin</artifactId>
+                        <version>5.1.2.Final</version>
+                        <configuration>
+                            <feature-packs>
+                                <feature-pack>
+                                    <location>org.wildfly:wildfly-galleon-pack:42.0.0.Final</location>
+                                </feature-pack>
+                                <feature-pack>
+                                    <location>org.wildfly:wildfly-ee-galleon-pack:42.0.0.Final</location>
+                                </feature-pack>
+                            </feature-packs>
+                            <layers>
+                                <layer>jaxrs</layer>
+                                <layer>cdi</layer>
+                                <layer>jpa</layer>
+                                <layer>datasources</layer>
+                                <layer>transactions</layer>
+                                <layer>batch-jberet</layer>
+                                <layer>ejb-lite</layer>
+                                <layer>bean-validation</layer>
+                                <layer>jsonb</layer>
+                                <layer>management</layer>
+                                <layer>core-tools</layer>
+                                <layer>deployment-scanner</layer>
+                            </layers>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>provision-slim-server</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>provision</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

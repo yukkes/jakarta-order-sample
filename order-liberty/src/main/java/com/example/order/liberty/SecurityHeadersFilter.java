@@ -1,5 +1,6 @@
 package com.example.order.liberty;
 
+import com.example.order.core.web.SecurityHeaders;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -11,26 +12,21 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 /**
- * Adds the security headers to every response, static files included.
+ * Applies {@link SecurityHeaders} to every response, static files included.
  *
- * <p>The portable core cannot do this: it has no Servlet API, and Quarkus has no Servlet
- * container. Quarkus sets the same headers with {@code quarkus.http.header.*} in
- * {@code application.properties}; the other runtimes get a copy of this filter.
+ * <p>This adapter has no other job: the header names and values live in the portable
+ * core, which also ships the UI they protect. Quarkus sets the same headers through
+ * {@code quarkus.http.header.*}. Because the three WAR adapters share the values,
+ * a CSP change is a one-line edit in core instead of three edits that can drift.
  */
 @WebFilter("/*")
 public class SecurityHeadersFilter implements Filter {
-
-    private static final String CONTENT_SECURITY_POLICY =
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
-                    + "frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
         if (response instanceof HttpServletResponse httpResponse) {
-            httpResponse.setHeader("Content-Security-Policy", CONTENT_SECURITY_POLICY);
-            httpResponse.setHeader("X-Content-Type-Options", "nosniff");
-            httpResponse.setHeader("Referrer-Policy", "no-referrer");
+            SecurityHeaders.responseHeaders().forEach(httpResponse::setHeader);
         }
         chain.doFilter(request, response);
     }

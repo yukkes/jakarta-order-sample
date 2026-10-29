@@ -15,6 +15,8 @@
 | Quarkus の REST 層は Quarkus REST | RESTEasy Classic より 4.0 の本線で、起動とスループットに有利 | [performance.md](performance.md) |
 | 月次スケジューラは Concurrency 3.1 | EJB を外して Liberty / WildFly の構成を軽くする（EE 11 の標準 API） | [runtimes.md](runtimes.md) |
 | Liberty は feature 最小構成、WildFly は Galleon slim | 不要な feature / layer を外して起動時間とサイズを抑える | [runtimes.md](runtimes.md) |
+| core は仕様別 API に依存（アンブレラ `jakartaee-api` を使わない） | EJB / Servlet / Quarkus が classpath に載らないので、移植性の違反がコンパイルエラーになる。`order-core` の enforcer が二重に防ぐ | 下の「モジュール構成と移植性」 |
+| セキュリティヘッダの値は core の `SecurityHeaders` が定義 | 3 つの WAR アダプタが同じ値を参照し、Quarkus の設定値との一致をテストで強制する | 下の「セキュリティヘッダ」 |
 
 実装上の判断と、Spring Boot との対応関係です。
 
@@ -23,6 +25,41 @@
 - UI レンダラの比較: [ui-lit-comparison.md](#ui-レンダラの比較lit-html)
 
 ## 設計上の注意
+### モジュール構成と移植性
+
+```
+order-api (生成DTO)  order-domain (Entity)
+        \                  /
+         order-core (web / service / repository / batch + UI + persistence.xml)
+                |
+   +------------+------------+-------------+
+   |            |            |             |
+order-quarkus  liberty     wildfly     glassfish
+```
+
+- `order-core` は層ごとに Maven モジュール分割しない。デプロイ単位が 1 つである以上、
+  分割しても得られるのはビルドの複雑さだけ（`web → service → repository` はパッケージとレビューで守る）
+- 移植性の担保は 2 段構え:
+  1. 仕様別 API（`jakarta.ws.rs-api` / `jakarta.persistence-api` / `jakarta.batch-api` など、すべて `provided`）だけに依存する。
+     `jakarta.ejb-api` や `jakarta.servlet-api` は classpath に無いので、うっかり EJB Timer を書くとコンパイルが通らない
+  2. `order-core` の `maven-enforcer-plugin` が `io.quarkus:*` / `org.springframework*` / `org.hibernate.orm:*` /
+     `jakarta.ejb:*` / `jakarta.servlet:*` を推移依存まで含めて禁止する
+- 単体テストは `order-core/src/test/java`（コンテナも DB も不要、`mvn -pl order-core -am test` で数秒）。
+  統合テスト（`@QuarkusTest`）は `order-quarkus/src/test/java` に置き、Embedded PostgreSQL を使う
+- Liberty の JDBC ドライバは `provided` 依存 + `maven-dependency-plugin` で `src/main/liberty/config/lib/` に配置する。
+  ドライバは WAR に入れない（サーバー側の責務）
+
+### セキュリティヘッダ
+
+CSP / `X-Content-Type-Options` / `Referrer-Policy` の**値**は `order-core` の
+`com.example.order.core.web.SecurityHeaders` が定義します。core は UI（`META-INF/resources`）も持っているため、
+CSP を UI と同じ場所で管理できます。
+
+- Quarkus: Servlet コンテナが無く、静的ファイルにもヘッダを付けられる `quarkus.http.header.*` を使う。
+  設定ファイルから Java 定数は参照できないため、`SecurityHeadersTest` が両者の一致を検証する（ずれたらテスト失敗）
+- Liberty / WildFly / GlassFish: 各アダプタの `SecurityHeadersFilter` が定数をそのまま適用する
+  （3 アダプタで値がドリフトしない）
+
 ### Quarkus の REST 層
 
 Quarkus 3.40 では RESTEasy Classic ではなく、`quarkus-rest` / `quarkus-rest-jsonb`

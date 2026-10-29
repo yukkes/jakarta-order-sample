@@ -52,7 +52,7 @@ Spring Boot を使わず、**Jakarta EE の仕様 API だけ**でオンライン
 order-sample/
 ├── order-api/        OpenAPI 定義から生成した DTO（+ 必要なら JAX-RS インターフェース）
 ├── order-domain/     JPA エンティティ（Jakarta Persistence のみ）
-├── order-core/       Jakarta EE API だけで実装した本体
+├── order-core/       Jakarta EE API だけで実装した本体（単体テストもここ）
 │   ├── web/          JAX-RS リソース + エラーマッピング（Controller 相当）
 │   ├── service/      CDI + @Transactional（Service 相当）
 │   ├── repository/   EntityManager / JPQL を隠蔽（Repository 相当）
@@ -66,7 +66,7 @@ order-sample/
 ├── order-liberty/    Open Liberty 実行アダプタ（WAR + server.xml + スケジューラ）
 ├── order-wildfly/    WildFly 実行アダプタ（WAR + jboss-web.xml + スケジューラ）
 ├── order-glassfish/  GlassFish 実行アダプタ（WAR + スケジューラ）
-└── docs/             ランタイム比較などのドキュメント
+└── docs/             ランタイム比較などのドキュメント（archive/ は過去の検討資料）
 ```
 
 依存方向は `web → service → repository → domain` です。Controller は Service だけを、
@@ -74,6 +74,11 @@ Service は Repository だけを参照し、JPQL や `EntityManager` は Reposit
 Web の DTO は `order-api` の OpenAPI 定義から生成し、`order-core` はその生成物を利用します。
 
 `order-core` は Quarkus に依存せず、Jakarta EE API と `order-api` / `order-domain` にだけ依存しています。
+依存はアンブレラの `jakarta.jakartaee-api` ではなく**仕様ごとの API**（`jakarta.ws.rs-api` など）で、
+`order-core` の `maven-enforcer-plugin` が Quarkus / Spring / Hibernate / EJB / Servlet の混入をビルド時に弾きます。
+`order-core/src/test/java` にはコンテナ不要の単体テストがあり、`mvn -pl order-core -am test` が数秒で回ります。
+セキュリティヘッダの値は `core/web/SecurityHeaders` が唯一の定義です（Quarkus は同じ値を `application.properties` に持ち、
+`SecurityHeadersTest` が一致を検証します）。
 Quarkus と Liberty の主な差分は次のとおりです（初期データ投入は CDI の `Startup` イベントで共通化しています）。
 
 | 関心事 | Quarkus 側 | Open Liberty 側 |

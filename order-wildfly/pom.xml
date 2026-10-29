@@ -18,7 +18,6 @@
         <dependency>
             <groupId>com.example.order</groupId>
             <artifactId>order-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>jakarta.platform</groupId>
@@ -50,7 +49,6 @@
                     <plugin>
                         <groupId>org.wildfly.plugins</groupId>
                         <artifactId>wildfly-maven-plugin</artifactId>
-                        <version>5.1.2.Final</version>
                         <configuration>
                             <feature-packs>
                                 <feature-pack>

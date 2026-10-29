@@ -28,23 +28,20 @@ ORDER_DEMO_USERS=true ./order-quarkus/target/order-quarkus-1.0.0-SNAPSHOT-runner
 ## Open Liberty 26
 `order-liberty` は同じ `order-core` を WAR に包んだアダプタです。
 
-1. PostgreSQL の JDBC ドライバを Liberty のサーバー設定 `lib` に置く
+1. PostgreSQL を起動しておく（Docker Compose または Embedded PostgreSQL ランチャー）
 
-   ```bash
-   mkdir -p order-liberty/src/main/liberty/config/lib
-   find ~/.m2/repository/org/postgresql/postgresql -name 'postgresql-*.jar' | head -1 \
-     | xargs -I{} cp {} order-liberty/src/main/liberty/config/lib/
-   ```
-
-2. PostgreSQL を起動しておく（Docker Compose または Embedded PostgreSQL ランチャー）
-
-3. WAR を作る
+2. WAR を作る
 
    ```bash
    mvn -pl order-liberty -am package
    ```
 
-4. Liberty を起動する（Quarkus は停止しておく。どちらも 8080 を使います）
+   JDBC ドライバ（`org.postgresql:postgresql`）は `order-liberty` の `provided` 依存で、
+   `maven-dependency-plugin` が `src/main/liberty/config/lib/` へ自動的にコピーします
+   （`server.xml` の `<fileset dir="${server.config.dir}/lib" includes="postgresql-*.jar"/>` が拾う）。
+   ドライバは WAR には入りません。バージョンはルート pom の `postgresql.version` で固定しています。
+
+3. Liberty を起動する（Quarkus は停止しておく。どちらも 8080 を使います）
 
    ```bash
    mvn -pl order-liberty liberty:create

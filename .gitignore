@@ -3,8 +3,6 @@ target/
 *.log
 /data/
 /order-quarkus/data/
-ObjectStore/
-PutObjectStoreDirHere/
 .idea/
 *.iml
 .vscode/

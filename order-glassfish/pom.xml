@@ -18,7 +18,6 @@
         <dependency>
             <groupId>com.example.order</groupId>
             <artifactId>order-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>jakarta.platform</groupId>

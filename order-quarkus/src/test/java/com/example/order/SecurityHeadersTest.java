@@ -1,5 +1,8 @@
 package com.example.order;
 
+import com.example.order.core.web.SecurityHeaders;
+import io.restassured.response.ExtractableResponse;
+import io.restassured.response.Response;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.Test;
@@ -11,6 +14,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * The security headers are added by the runtime (Quarkus: {@code quarkus.http.header.*},
@@ -47,6 +51,26 @@ class SecurityHeadersTest extends AuthenticatedTest {
                 .header("Content-Security-Policy", containsString("default-src 'self'"))
                 .header("X-Content-Type-Options", "nosniff")
                 .header("Referrer-Policy", "no-referrer");
+    }
+
+    /**
+     * Quarkus sets the headers from {@code application.properties}, which cannot reference
+     * the constants. This keeps the two in sync: changing one without the other fails here.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"/", "/index.html", "/login.html"})
+    void quarkusHeaderConfigMatchesTheCoreValuesForPages(String path) {
+        assertHeadersMatchTheCore(given().get(path).then().statusCode(200).extract());
+    }
+
+    @Test
+    void quarkusHeaderConfigMatchesTheCoreValuesForApiResponses() {
+        assertHeadersMatchTheCore(api().get("/api/products?page=0&size=1").then().statusCode(200).extract());
+    }
+
+    private static void assertHeadersMatchTheCore(ExtractableResponse<Response> response) {
+        SecurityHeaders.responseHeaders()
+                .forEach((name, value) -> assertEquals(value, response.header(name), name));
     }
 
     @ParameterizedTest

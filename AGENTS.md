@@ -6,6 +6,14 @@ Keep it portable.
 ## Rules
 - `order-core` = Jakarta EE API + `order-api` + `order-domain` only.
   No Quarkus/Spring/MicroProfile/Hibernate-specific code or deps.
+- Depend on the individual spec APIs (`jakarta.ws.rs-api`, `jakarta.persistence-api`,
+  `jakarta.batch-api`, ... all `provided`), never the `jakarta.jakartaee-api` umbrella:
+  the enforcer in `order-core/pom.xml` bans Quarkus/Spring/Hibernate/EJB/Servlet on the
+  portable classpath. Add a new spec only by adding its `-api` artifact to the root BOM list.
+- Security header values live in `core/web/SecurityHeaders`; Quarkus mirrors them in
+  `application.properties` and `SecurityHeadersTest` fails if the two drift.
+- Unit tests that need no container belong in `order-core/src/test/java`; `@QuarkusTest`
+  integration tests stay in `order-quarkus/src/test/java`.
 - Runtime code only in `order-quarkus` / `order-liberty` / `order-wildfly` / `order-glassfish`.
 - `order-quarkus` uses Quarkus REST (`quarkus-rest` + `quarkus-rest-jsonb`), not RESTEasy Classic.
 - Schedulers stay in the runtime adapters. Liberty / WildFly / GlassFish use Concurrency 3.1
@@ -32,10 +40,16 @@ Keep it portable.
 ## Commands
 ```bash
 export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+mvn -pl order-core -am test      # seconds, no DB: run this first
 mvn -pl order-quarkus -am test   # required
 mvn -DskipTests package          # all runtimes
 ```
 DB: `localhost:5432/orders`, `orders/orders`.
+
+GitHub Actions: pin exact releases (`actions/checkout@v7.0.1`, never `@v7`) and keep
+`.github/workflows/actions.lock` in sync with `gh extension install github/gh-actions-lock`
++ `gh actions-lock`. The `lockfile` job fails when a `uses:` version and the lock disagree.
+Dependabot only bumps the workflow file — finish such a PR with `gh actions-lock`.
 
 ## Gotchas
 - UI: use `response.content`, not `.length` / `.map`.

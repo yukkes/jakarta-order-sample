@@ -14,7 +14,7 @@
         <feature>jsonp-2.1</feature>
         <feature>validation-3.1</feature>
         <feature>batch-2.1</feature>
-        <feature>enterpriseBeansLite-4.0</feature>
+        <feature>concurrent-3.1</feature>
         <feature>appSecurity-6.0</feature>
         <feature>mpOpenAPI-4.0</feature>
     </featureManager>
@@ -23,9 +23,7 @@
                   httpPort="8080"
                   httpsPort="9443"/>
 
-    <!-- The application authenticates with its own tokens, so no container users are defined.
-         A registry is still required for the ORB that the EJB container starts. -->
-    <basicRegistry id="basic" realm="BasicRealm"/>
+    <!-- The application authenticates with its own tokens, so no container users are defined. -->
 
     <!-- The app calls JobOperator as an unauthenticated subject, so batch submission and
          monitoring must be open to EVERYONE. There is no batchAdmin: the sample has no

@@ -10,7 +10,6 @@ import jakarta.persistence.EntityManager;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class OrderRepository {
@@ -23,31 +22,26 @@ public class OrderRepository {
     }
 
     public List<Order> findPage(OrderStatus status, long offset, int limit, List<SortOrder> sort) {
-        String orderBy = sort.isEmpty()
-                ? "o.id desc"
-                : sort.stream().map(sortOrder -> sortOrder.jpql("o")).collect(Collectors.joining(", "));
         String jpql = (status == null
                 ? "select o from Order o"
                 : "select o from Order o where o.status = :status")
-                + " order by " + orderBy;
-        var query = entityManager.createQuery(jpql, Order.class)
-                .setFirstResult((int) Math.min(offset, Integer.MAX_VALUE))
-                .setMaxResults(limit);
-        if (status != null) {
-            query.setParameter("status", status);
-        }
-        return query.getResultList();
+                + " order by " + Jpql.orderBy(sort, "o", "o.id desc");
+        return Jpql.page(entityManager, jpql, Order.class, offset, limit, query -> {
+            if (status != null) {
+                query.setParameter("status", status);
+            }
+        });
     }
 
     public long count(OrderStatus status) {
         String jpql = status == null
                 ? "select count(o) from Order o"
                 : "select count(o) from Order o where o.status = :status";
-        var query = entityManager.createQuery(jpql, Long.class);
-        if (status != null) {
-            query.setParameter("status", status);
-        }
-        return query.getSingleResult();
+        return Jpql.count(entityManager, jpql, query -> {
+            if (status != null) {
+                query.setParameter("status", status);
+            }
+        });
     }
 
     /**

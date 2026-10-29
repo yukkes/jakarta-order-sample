@@ -67,7 +67,7 @@
                                 <layer>datasources</layer>
                                 <layer>transactions</layer>
                                 <layer>batch-jberet</layer>
-                                <layer>ejb-lite</layer>
+                                <layer>ee-concurrency</layer>
                                 <layer>bean-validation</layer>
                                 <layer>jsonb</layer>
                                 <layer>management</layer>

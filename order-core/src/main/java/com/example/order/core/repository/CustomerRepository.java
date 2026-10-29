@@ -8,7 +8,6 @@ import jakarta.persistence.EntityManager;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class CustomerRepository {
@@ -17,18 +16,13 @@ public class CustomerRepository {
     private EntityManager entityManager;
 
     public List<Customer> findPage(long offset, int limit, List<SortOrder> sort) {
-        String orderBy = sort.isEmpty()
-                ? "c.code asc"
-                : sort.stream().map(sortOrder -> sortOrder.jpql("c")).collect(Collectors.joining(", "));
-        return entityManager.createQuery("select c from Customer c order by " + orderBy, Customer.class)
-                .setFirstResult((int) Math.min(offset, Integer.MAX_VALUE))
-                .setMaxResults(limit)
-                .getResultList();
+        String orderBy = Jpql.orderBy(sort, "c", "c.code asc");
+        return Jpql.page(entityManager, "select c from Customer c order by " + orderBy,
+                Customer.class, offset, limit);
     }
 
     public long count() {
-        return entityManager.createQuery("select count(c) from Customer c", Long.class)
-                .getSingleResult();
+        return Jpql.count(entityManager, "select count(c) from Customer c");
     }
 
     public Optional<Customer> findByCode(String code) {

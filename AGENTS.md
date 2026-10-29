@@ -50,6 +50,9 @@ GitHub Actions: pin exact releases (`actions/checkout@v7.0.1`, never `@v7`) and 
 `.github/workflows/actions.lock` in sync with `gh extension install github/gh-actions-lock`
 + `gh actions-lock`. The `lockfile` job fails when a `uses:` version and the lock disagree.
 Dependabot only bumps the workflow file — finish such a PR with `gh actions-lock`.
+Local `act` runs need a non-root user (embedded PostgreSQL refuses root) and an image with
+`gh` + Maven; `actions/upload-artifact@v7` cannot be verified locally (act's artifact
+server predates it).
 
 ## Gotchas
 - UI: use `response.content`, not `.length` / `.map`.

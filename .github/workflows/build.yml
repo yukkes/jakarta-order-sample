@@ -9,6 +9,17 @@ name: build
 # .github/workflows/actions.lock; a stale lock fails the workflow with "Invalid lockfile".
 # Ranges such as `@v7` are rejected by the tooling, and the `lockfile` job below re-checks
 # the lock on every run so a dependabot bump cannot merge without regenerating it.
+#
+# Local runs with nektos/act: use an image that has gh and Maven (hosted runners do) and
+# run a non-root user, because embedded PostgreSQL refuses initdb as root:
+#   docker build -t act-runner:java - <<'D'
+#   FROM catthehacker/ubuntu:act-latest
+#   COPY gh /usr/local/bin/gh
+#   RUN apt-get update && apt-get install -y --no-install-recommends maven && rm -rf /var/lib/apt/lists/*
+#   D
+#   act -P ubuntu-latest=act-runner:java --container-options="--user 1000:1000"
+# act's artifact server also predates upload-artifact v7 (unknown field "mime_type"), so the
+# upload step only passes on GitHub; every other step runs locally.
 on:
   push:
     branches: [ main ]

@@ -12,9 +12,12 @@ import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 
+import java.util.Base64;
+
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -147,37 +150,41 @@ class AuthTest {
     }
 
     @Test
-    void logoutRevokesBearerToken() {
-        String token = login("user", "user");
+    void logoutRevokesTheRefreshTokenButNotTheAccessToken() {
+        Response session = sessionLogin("user", "user");
+        String accessToken = session.getCookie("ORDER_SESSION");
+        String csrfToken = session.getCookie("XSRF-TOKEN");
+        String refreshToken = session.getCookie("ORDER_REFRESH");
 
         given()
-                .auth().oauth2(token)
+                .cookie("ORDER_SESSION", accessToken)
+                .cookie("XSRF-TOKEN", csrfToken)
+                .cookie("ORDER_REFRESH", refreshToken)
+                .header("X-XSRF-TOKEN", csrfToken)
                 .post("/api/auth/logout")
                 .then()
                 .statusCode(204);
 
-        given()
-                .auth().oauth2(token)
-                .get("/api/orders")
-                .then()
-                .statusCode(401)
-                .body("message", containsString("セッション"));
+        // Access tokens are stateless: they stay valid until they expire (short TTL).
+        given().auth().oauth2(accessToken).get("/api/orders").then().statusCode(200);
+        // Revocation happens at the refresh token, which is rotated on every use.
+        given().cookie("ORDER_REFRESH", refreshToken).post("/api/auth/refresh").then().statusCode(401);
     }
 
     @Test
-    void disablingUserRevokesExistingToken() {
+    void disablingUserStopsRefreshButNotTheAccessToken() {
         createUser("disable-me", passwordHasher.hash("disable-me"));
-        String token = login("disable-me", "disable-me");
-        given().auth().oauth2(token).get("/api/orders").then().statusCode(200);
+        Response session = sessionLogin("disable-me", "disable-me");
+        String accessToken = session.getCookie("ORDER_SESSION");
+        String refreshToken = session.getCookie("ORDER_REFRESH");
+        given().auth().oauth2(accessToken).get("/api/orders").then().statusCode(200);
 
         QuarkusTransaction.requiringNew().run(() ->
                 userRepository.findByUsername("disable-me").orElseThrow().setEnabled(false));
 
-        given()
-                .auth().oauth2(token)
-                .get("/api/orders")
-                .then()
-                .statusCode(401);
+        // Bounded by the access token TTL; the refresh path is rejected immediately.
+        given().auth().oauth2(accessToken).get("/api/orders").then().statusCode(200);
+        given().cookie("ORDER_REFRESH", refreshToken).post("/api/auth/refresh").then().statusCode(401);
     }
 
     @Test
@@ -326,41 +333,101 @@ class AuthTest {
     }
 
     @Test
-    void idleSessionExpiresAfterThirtyMinutes() {
-        String token = login("user", "user");
-        given().auth().oauth2(token).get("/api/orders").then().statusCode(200);
+    void idleRefreshTokenExpiresAfterThirtyMinutes() {
+        Response session = sessionLogin("user", "user");
+        String accessToken = session.getCookie("ORDER_SESSION");
+        String refreshToken = session.getCookie("ORDER_REFRESH");
+        given().auth().oauth2(accessToken).get("/api/orders").then().statusCode(200);
 
         QuarkusTransaction.requiringNew().run(() -> entityManager
                 .createQuery("update AuthToken t set t.lastUsedAt = :stale where t.user.username = 'user'")
                 .setParameter("stale", java.time.LocalDateTime.now().minusMinutes(31))
                 .executeUpdate());
 
-        given()
-                .auth().oauth2(token)
-                .get("/api/orders")
-                .then()
-                .statusCode(401);
+        given().auth().oauth2(accessToken).get("/api/orders").then().statusCode(200);
+        given().cookie("ORDER_REFRESH", refreshToken).post("/api/auth/refresh").then().statusCode(401);
     }
 
     @Test
     void keepsAtMostTenSessionsPerUser() {
         createUser("many-sessions", passwordHasher.hash("many-sessions"));
 
-        String first = login("many-sessions", "many-sessions");
+        Response first = sessionLogin("many-sessions", "many-sessions");
+        String firstRefresh = first.getCookie("ORDER_REFRESH");
         for (int session = 1; session < 10; session++) {
-            login("many-sessions", "many-sessions");
+            sessionLogin("many-sessions", "many-sessions");
         }
-        given().auth().oauth2(first).get("/api/auth/me").then().statusCode(200);
 
-        String eleventh = login("many-sessions", "many-sessions");
+        Response eleventh = sessionLogin("many-sessions", "many-sessions");
+        String eleventhRefresh = eleventh.getCookie("ORDER_REFRESH");
 
-        given().auth().oauth2(first).get("/api/auth/me").then().statusCode(401);
-        given().auth().oauth2(eleventh).get("/api/auth/me").then().statusCode(200);
+        // The oldest refresh token was dropped when the eleventh session started.
+        given().cookie("ORDER_REFRESH", firstRefresh).post("/api/auth/refresh").then().statusCode(401);
+        given().cookie("ORDER_REFRESH", eleventhRefresh).post("/api/auth/refresh").then().statusCode(200);
+    }
+
+    @Test
+    void refreshRotatesTheRefreshToken() {
+        Response session = sessionLogin("user", "user");
+        String firstRefresh = session.getCookie("ORDER_REFRESH");
+
+        Response refreshed = given()
+                .cookie("ORDER_REFRESH", firstRefresh)
+                .post("/api/auth/refresh")
+                .then()
+                .statusCode(200)
+                .body("username", is("user"))
+                .extract()
+                .response();
+
+        String secondRefresh = refreshed.getCookie("ORDER_REFRESH");
+        String accessToken = refreshed.getCookie("ORDER_SESSION");
+        assertThat(secondRefresh, notNullValue());
+        assertThat(secondRefresh, is(not(firstRefresh)));
+        given().auth().oauth2(accessToken).get("/api/orders").then().statusCode(200);
+
+        // A replayed refresh token is rejected.
+        given().cookie("ORDER_REFRESH", firstRefresh).post("/api/auth/refresh").then().statusCode(401);
+    }
+
+    @Test
+    void refreshNeedsARefreshToken() {
+        given().post("/api/auth/refresh").then().statusCode(401);
+    }
+
+    @Test
+    void rejectsTamperedAccessToken() {
+        String token = login("user", "user");
+        String[] parts = token.split("\\.");
+
+        // Flip a bit of the decoded HS256 signature instead of editing the base64url text:
+        // the last character only carries 4 of its 6 bits (256-bit signature, 43 chars), so
+        // replacing 'A' with 'B' can decode to exactly the same bytes and leave the token valid.
+        byte[] signature = Base64.getUrlDecoder().decode(parts[2]);
+        signature[0] ^= 0x01;
+        String tampered = parts[0] + "." + parts[1] + "."
+                + Base64.getUrlEncoder().withoutPadding().encodeToString(signature);
+
+        assertThat(tampered, is(not(token)));
+        given().auth().oauth2(tampered).get("/api/orders").then().statusCode(401);
     }
 
     private void createUser(String username, String passwordHash) {
         QuarkusTransaction.requiringNew().run(() ->
                 userRepository.persist(new User(username, passwordHash, "USER")));
+    }
+
+    private Response sessionLogin(String username, String password) {
+        return given()
+                .contentType(ContentType.JSON)
+                .body("""
+                        {"username":"%s","password":"%s"}
+                        """.formatted(username, password))
+                .post("/api/auth/session")
+                .then()
+                .statusCode(200)
+                .extract()
+                .response();
     }
 
     private String login(String username, String password) {

@@ -3,6 +3,7 @@ package com.example.order.core.service;
 import com.example.order.core.repository.AuthTokenRepository;
 import com.example.order.core.repository.UserRepository;
 import com.example.order.core.security.PasswordHasher;
+import com.example.order.core.security.SecuritySettings;
 import com.example.order.core.security.TokenService;
 import com.example.order.core.web.error.AuthException;
 import com.example.order.domain.AuthToken;
@@ -12,17 +13,30 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 import java.util.Set;
 
+/**
+ * Two-token authentication.
+ *
+ * <ul>
+ *   <li><b>Access token</b>: stateless HS256 JWT, verified without touching the database.
+ *       Its short lifetime bounds how long a revoked session or disabled user can still
+ *       make requests.</li>
+ *   <li><b>Refresh token</b>: opaque, random, stored hashed in {@code auth_tokens}. It is
+ *       only presented to {@code /api/auth/refresh}, which is the only place that pays a
+ *       DB query. Refresh tokens are rotated on every use, are idled out after
+ *       {@link #IDLE_TIMEOUT} and are capped at {@link #MAX_SESSIONS_PER_USER} per user.</li>
+ * </ul>
+ */
 @ApplicationScoped
 public class AuthService {
 
-    private static final Duration TOKEN_TTL = Duration.ofHours(8);
+    private static final Duration REFRESH_TTL = Duration.ofHours(8);
     private static final Duration IDLE_TIMEOUT = Duration.ofMinutes(30);
-    /** Throttles the {@code last_used_at} UPDATE to at most once per minute per token. */
-    private static final Duration TOUCH_INTERVAL = Duration.ofMinutes(1);
     private static final int MAX_SESSIONS_PER_USER = 10;
     private static final int MAX_FAILED_LOGINS = 5;
     private static final Duration LOCK_DURATION = Duration.ofMinutes(15);
@@ -38,6 +52,9 @@ public class AuthService {
 
     @Inject
     private TokenService tokenService;
+
+    @Inject
+    private SecuritySettings settings;
 
     /**
      * Failed attempts must be committed even though AuthException is thrown, hence
@@ -68,36 +85,88 @@ public class AuthService {
         // Keep the number of parallel sessions bounded: drop the least recently used ones.
         authTokenRepository.deleteOldestBeyond(user, now, MAX_SESSIONS_PER_USER - 1);
 
-        String token = tokenService.newToken();
-        String csrfToken = tokenService.newCsrfToken();
-        LocalDateTime expiresAt = now.plus(TOKEN_TTL);
-        authTokenRepository.persist(new AuthToken(
-                tokenService.hash(token), user, tokenService.hash(csrfToken), expiresAt));
+        String refreshToken = tokenService.newToken();
+        AuthToken session = new AuthToken(tokenService.hash(refreshToken), user, now.plus(REFRESH_TTL));
+        authTokenRepository.persist(session);
 
-        return new LoginResult(token, csrfToken, expiresAt, toAuthenticatedUser(user));
+        return issue(user, session, refreshToken, now);
     }
 
+    /**
+     * Exchanges a refresh token for a new access token and a rotated refresh token.
+     * This is the only request that reads session state from the database.
+     */
     @Transactional
-    public Optional<AuthSession> authenticate(String token) {
+    public Optional<LoginResult> refresh(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return Optional.empty();
+        }
         LocalDateTime now = LocalDateTime.now();
-        return authTokenRepository.findByTokenHash(tokenService.hash(token))
-                .filter(authToken -> authToken.getExpiresAt().isAfter(now))
-                .filter(authToken -> !authToken.isIdleSince(now, IDLE_TIMEOUT))
-                .map(authToken -> {
-                    if (authToken.shouldTouch(now, TOUCH_INTERVAL)) {
-                        authToken.touch(now);
-                    }
-                    return new AuthSession(
-                            toAuthenticatedUser(authToken.getUser()),
-                            authToken.getTokenHash(),
-                            authToken.getCsrfTokenHash());
-                });
+        Optional<AuthToken> found = authTokenRepository.findByTokenHash(tokenService.hash(refreshToken));
+        if (found.isEmpty()) {
+            return Optional.empty();
+        }
+        AuthToken current = found.get();
+        if (!current.getExpiresAt().isAfter(now) || current.isIdleSince(now, IDLE_TIMEOUT)) {
+            authTokenRepository.delete(current);
+            return Optional.empty();
+        }
+
+        // Rotation: a stolen refresh token is only usable once.
+        String nextRefreshToken = tokenService.newToken();
+        authTokenRepository.delete(current);
+        AuthToken next = new AuthToken(tokenService.hash(nextRefreshToken), current.getUser(), now.plus(REFRESH_TTL));
+        authTokenRepository.persist(next);
+
+        return Optional.of(issue(current.getUser(), next, nextRefreshToken, now));
     }
 
+    /** Verifies the access token signature and claims. No database access. */
+    public Optional<AuthSession> authenticate(String accessToken) {
+        Instant now = Instant.now();
+        return tokenService.parseAccessToken(settings.tokenSecret(), accessToken)
+                .filter(token -> token.expiresAt().isAfter(now))
+                .map(token -> new AuthSession(
+                        new AuthenticatedUser(token.userId(), token.username(), token.roles()),
+                        token.csrfToken(),
+                        token.sessionId()));
+    }
+
+    /** Revokes the refresh token; the access token expires on its own. */
     @Transactional
-    public void logout(String token) {
-        authTokenRepository.findByTokenHash(tokenService.hash(token))
+    public void logout(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return;
+        }
+        authTokenRepository.findByTokenHash(tokenService.hash(refreshToken))
                 .ifPresent(authTokenRepository::delete);
+    }
+
+    private LoginResult issue(User user, AuthToken session, String refreshToken, LocalDateTime now) {
+        Instant issuedAt = toInstant(now);
+        Instant expiresAt = issuedAt.plus(settings.accessTokenTtl());
+        String csrfToken = tokenService.newCsrfToken();
+        String accessToken = tokenService.accessToken(
+                settings.tokenSecret(),
+                user.getId(),
+                user.getUsername(),
+                Set.of(user.getRole()),
+                session.getId(),
+                csrfToken,
+                issuedAt,
+                expiresAt);
+
+        return new LoginResult(
+                accessToken,
+                refreshToken,
+                csrfToken,
+                LocalDateTime.ofInstant(expiresAt, ZoneId.systemDefault()),
+                LocalDateTime.ofInstant(toInstant(now.plus(REFRESH_TTL)), ZoneId.systemDefault()),
+                toAuthenticatedUser(user));
+    }
+
+    private static Instant toInstant(LocalDateTime value) {
+        return value.atZone(ZoneId.systemDefault()).toInstant();
     }
 
     private AuthenticatedUser toAuthenticatedUser(User user) {
@@ -107,10 +176,11 @@ public class AuthService {
     public record AuthenticatedUser(Long id, String username, Set<String> roles) {
     }
 
-    public record AuthSession(AuthenticatedUser user, String tokenHash, String csrfTokenHash) {
+    public record AuthSession(AuthenticatedUser user, String csrfToken, long sessionId) {
     }
 
-    public record LoginResult(String token, String csrfToken, LocalDateTime expiresAt,
+    public record LoginResult(String accessToken, String refreshToken, String csrfToken,
+                              LocalDateTime expiresAt, LocalDateTime refreshExpiresAt,
                               AuthenticatedUser user) {
     }
 }

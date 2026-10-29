@@ -7,6 +7,7 @@ import com.example.order.api.model.UserResponse;
 import com.example.order.core.security.SecuritySettings;
 import com.example.order.core.service.AuthService;
 import com.example.order.core.service.AuthService.LoginResult;
+import com.example.order.core.web.error.AuthException;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
@@ -30,7 +31,7 @@ import java.util.List;
 @Produces({MediaType.APPLICATION_JSON, "application/problem+json"})
 public class AuthResource {
 
-    private static final int COOKIE_MAX_AGE = 8 * 60 * 60;
+    private static final long REFRESH_MAX_AGE = 8 * 60 * 60;
 
     @Inject
     private AuthService authService;
@@ -50,28 +51,30 @@ public class AuthResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public Response session(@Valid LoginRequest request) {
         LoginResult result = authService.login(request.getUsername(), request.getPassword());
-        boolean secure = isSecure();
-
-        return Response.ok(toUserResponse(result))
-                .cookie(
-                        cookie(AuthTokens.SESSION_COOKIE, result.token(), COOKIE_MAX_AGE, true, secure),
-                        cookie(AuthTokens.CSRF_COOKIE, result.csrfToken(), COOKIE_MAX_AGE, false, secure))
-                .build();
+        return withSessionCookies(Response.ok(toUserResponse(result)), result).build();
     }
 
+    /** Bearer-token clients get the access token (and a refresh token) in the body. */
     @POST
     @Path("/login")
     @PublicEndpoint
     @Consumes(MediaType.APPLICATION_JSON)
     public LoginResponse login(@Valid LoginRequest request) {
-        LoginResult result = authService.login(request.getUsername(), request.getPassword());
+        return toLoginResponse(authService.login(request.getUsername(), request.getPassword()));
+    }
 
-        LoginResponse response = new LoginResponse();
-        response.setToken(result.token());
-        response.setExpiresAt(result.expiresAt());
-        response.setUsername(result.user().username());
-        response.setRoles(List.copyOf(result.user().roles()));
-        return response;
+    /**
+     * The only endpoint that reads session state from the database. Rotates the refresh
+     * token, so a replayed refresh token is rejected.
+     */
+    @POST
+    @Path("/refresh")
+    @PublicEndpoint
+    public Response refresh() {
+        String refreshToken = AuthTokens.cookie(headers, AuthTokens.REFRESH_COOKIE);
+        LoginResult result = authService.refresh(refreshToken)
+                .orElseThrow(AuthException::invalidCredentials);
+        return withSessionCookies(Response.ok(toLoginResponse(result)), result).build();
     }
 
     @GET
@@ -101,13 +104,33 @@ public class AuthResource {
     @Path("/logout")
     @RequireRole({"USER", "ADMIN"})
     public Response logout() {
-        AuthTokens.extract(headers).ifPresent(source -> authService.logout(source.token()));
+        authService.logout(AuthTokens.cookie(headers, AuthTokens.REFRESH_COOKIE));
 
         return Response.noContent()
                 .cookie(
-                        cookie(AuthTokens.SESSION_COOKIE, "", 0, true, isSecure()),
-                        cookie(AuthTokens.CSRF_COOKIE, "", 0, false, isSecure()))
+                        cookie(AuthTokens.SESSION_COOKIE, "", 0, "/", true),
+                        cookie(AuthTokens.CSRF_COOKIE, "", 0, "/", false),
+                        cookie(AuthTokens.REFRESH_COOKIE, "", 0, AuthTokens.REFRESH_COOKIE_PATH, true))
                 .build();
+    }
+
+    private Response.ResponseBuilder withSessionCookies(Response.ResponseBuilder builder, LoginResult result) {
+        int accessMaxAge = (int) Math.max(settings.accessTokenTtl().toSeconds(), 1);
+        return builder.cookie(
+                cookie(AuthTokens.SESSION_COOKIE, result.accessToken(), accessMaxAge, "/", true),
+                cookie(AuthTokens.CSRF_COOKIE, result.csrfToken(), (int) REFRESH_MAX_AGE, "/", false),
+                cookie(AuthTokens.REFRESH_COOKIE, result.refreshToken(), (int) REFRESH_MAX_AGE,
+                        AuthTokens.REFRESH_COOKIE_PATH, true));
+    }
+
+    private LoginResponse toLoginResponse(LoginResult result) {
+        LoginResponse response = new LoginResponse();
+        response.setToken(result.accessToken());
+        response.setRefreshToken(result.refreshToken());
+        response.setExpiresAt(result.expiresAt());
+        response.setUsername(result.user().username());
+        response.setRoles(List.copyOf(result.user().roles()));
+        return response;
     }
 
     private UserResponse toUserResponse(LoginResult result) {
@@ -135,18 +158,15 @@ public class AuthResource {
         return roles;
     }
 
-    private NewCookie cookie(String name, String value, int maxAge, boolean httpOnly, boolean secure) {
+    /** All cookies are SameSite=Strict; {@code refresh} lives under {@code /api/auth}. */
+    private NewCookie cookie(String name, String value, int maxAge, String path, boolean httpOnly) {
         return new NewCookie(
-                new Cookie(name, value, "/", null),
+                new Cookie(name, value, path, null),
                 null,
                 maxAge,
                 null,
-                secure,
+                settings.secureCookie(uriInfo.getRequestUri(), headers.getHeaderString(AuthFilter.FORWARDED_PROTO)),
                 httpOnly,
                 NewCookie.SameSite.STRICT);
-    }
-
-    private boolean isSecure() {
-        return settings.secureCookie(uriInfo.getRequestUri(), headers.getHeaderString(AuthFilter.FORWARDED_PROTO));
     }
 }

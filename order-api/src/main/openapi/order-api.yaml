@@ -488,6 +488,9 @@ components:
       properties:
         token:
           type: string
+        refreshToken:
+          type: string
+          description: Rotated on every refresh; only the browser flow also stores it in the ORDER_REFRESH cookie.
         expiresAt:
           type: string
           format: date-time

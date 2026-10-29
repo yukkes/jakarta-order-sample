@@ -4,7 +4,10 @@ import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.security.SecureRandom;
+import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Function;
@@ -37,6 +40,8 @@ public class SecuritySettings {
     private String userPassword;
     private CookieSecure cookieSecure;
     private boolean trustForwardedProto;
+    private byte[] tokenSecret;
+    private Duration accessTokenTtl;
 
     @PostConstruct
     void init() {
@@ -61,6 +66,33 @@ public class SecuritySettings {
             throw new IllegalStateException("order.cookie-secure must be always, auto or never: " + secure);
         }
         trustForwardedProto = source.apply("trust-forwarded-proto").map(Boolean::parseBoolean).orElse(false);
+        tokenSecret = source.apply("token-secret")
+                .map(value -> value.getBytes(StandardCharsets.UTF_8))
+                .orElseGet(SecuritySettings::randomSecret);
+        accessTokenTtl = Duration.ofSeconds(Long.parseLong(
+                source.apply("access-token-ttl-seconds").orElse("600")));
+    }
+
+    private static byte[] randomSecret() {
+        byte[] generated = new byte[32];
+        new SecureRandom().nextBytes(generated);
+        LOG.warning("order.token-secret is not set: access tokens are signed with a random secret and "
+                + "become invalid after a restart. Set ORDER_TOKEN_SECRET in production.");
+        return generated;
+    }
+
+    /**
+     * Secret used to sign the stateless access token (HMAC-SHA256). Configure
+     * {@code order.token-secret} / {@code ORDER_TOKEN_SECRET} so that tokens survive
+     * restarts and are accepted by every node.
+     */
+    public byte[] tokenSecret() {
+        return tokenSecret.clone();
+    }
+
+    /** Lifetime of an access token; short enough that revocation delay stays bounded. */
+    public Duration accessTokenTtl() {
+        return accessTokenTtl;
     }
 
     /** Directory that batch CSV imports may read from. */

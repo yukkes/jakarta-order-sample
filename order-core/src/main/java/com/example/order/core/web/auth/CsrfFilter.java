@@ -1,6 +1,5 @@
 package com.example.order.core.web.auth;
 
-import com.example.order.core.security.TokenService;
 import com.example.order.core.service.AuthService.AuthSession;
 import jakarta.annotation.Priority;
 import jakarta.inject.Inject;
@@ -15,9 +14,6 @@ import java.security.MessageDigest;
 @Provider
 @Priority(Priorities.AUTHORIZATION)
 public class CsrfFilter implements ContainerRequestFilter {
-
-    @Inject
-    private TokenService tokenService;
 
     @Override
     public void filter(ContainerRequestContext request) {
@@ -37,7 +33,7 @@ public class CsrfFilter implements ContainerRequestFilter {
         String cookie = AuthTokens.cookie(request.getHeaders(), AuthTokens.CSRF_COOKIE);
         if (header == null || cookie == null
                 || !constantTimeEquals(header, cookie)
-                || !constantTimeEquals(tokenService.hash(header), session.csrfTokenHash())) {
+                || !constantTimeEquals(header, session.csrfToken())) {
             request.abortWith(AuthResponses.forbidden(request, "CSRF トークンが不正です"));
         }
     }

@@ -155,6 +155,8 @@ java -Dorder.demo-users=true -jar order-quarkus/target/quarkus-app/quarkus-run.j
 
 - 画面: <http://localhost:8080/>（ログイン、注文のステータス絞り込み、注文・商品・請求書のページング / ソート、バッチ実行に対応）
 - UI は MUI のデフォルトテーマ（Roboto / `#1976d2` / 4px 角丸 / Elevation）に準拠し、モバイルではテーブルを横スクロール
+- 描画は [lit-html 3.3.3](https://www.npmjs.com/package/lit-html) を `META-INF/resources/vendor/lit-html` に同梱して使用（ES モジュール、ビルド不要、BSD-3-Clause）。
+  比較レポートは [docs/ui-lit-comparison.md](docs/ui-lit-comparison.md)
 - アイコンは Font Awesome Free 6.7.2 の `file-circle-check` をインライン SVG で使用（ヘッダー / ログイン / favicon 共通、CC BY 4.0）
 - Lighthouse（mobile / desktop、ログイン / ダッシュボード）: Performance / Accessibility / Best Practices / SEO すべて 100
 - ログイン画面: <http://localhost:8080/login.html>
@@ -181,6 +183,8 @@ mvn -pl order-quarkus quarkus:dev
 | `order.admin-password` / `ORDER_ADMIN_PASSWORD` | `admin`（`ADMIN`）をこのパスワードで作成 |
 | `order.user-password` / `ORDER_USER_PASSWORD` | `user`（`USER`）をこのパスワードで作成 |
 | `order.demo-users=true` / `ORDER_DEMO_USERS=true` | パスワード未指定のユーザーを `admin` / `admin`、`user` / `user` で作成（ローカル専用） |
+| `order.token-secret` / `ORDER_TOKEN_SECRET` | アクセストークンの署名鍵。未設定なら起動ごとにランダム生成（再起動でトークンが無効になる） |
+| `order.access-token-ttl-seconds` / `ORDER_ACCESS_TOKEN_TTL_SECONDS` | アクセストークンの寿命（既定 600 秒） |
 
   DB の接続情報も環境変数で上書きできます（既定値はローカル開発用）。
   Quarkus は `application.properties` の `${DB_USER:orders}` 形式、Liberty は `server.xml` の `<variable>` で参照します。
@@ -195,9 +199,15 @@ mvn -pl order-quarkus quarkus:dev
   どれも設定しないとユーザーは作成されず、ログインできません（起動ログに WARNING が出ます）。
   `quarkus:dev`、Quarkus のテスト、Liberty（`src/main/liberty/config/jvm.options`）では `order.demo-users=true` を設定済みです。
   `scripts/smoke-test.sh` は `user` / `user` でログインするため、デモユーザーを有効にしたサーバーに対して実行してください。
-- ブラウザは `/api/auth/session` で `ORDER_SESSION`（`HttpOnly`）と `XSRF-TOKEN` Cookie を受け取ります
+- 認証は 2 種類のトークンで行います
+  - **アクセストークン**: HS256 署名の JWT（既定 10 分）。`ORDER_SESSION` Cookie または `Authorization: Bearer` で送り、
+    検証は署名とクレームだけで、**DB アクセスはありません**
+  - **リフレッシュトークン**: ランダムな不透明トークン。ハッシュだけを DB に保存します。`ORDER_REFRESH`（`HttpOnly`、`/api/auth`）
+    Cookie、または `/api/auth/login` のレスポンスで受け取り、`POST /api/auth/refresh` で更新します（使うたびにローテーション）
+- ブラウザは `/api/auth/session` で `ORDER_SESSION` / `XSRF-TOKEN` / `ORDER_REFRESH` の 3 つの Cookie を受け取ります
+- アクセストークンが切れると SPA は自動で `/api/auth/refresh` を呼び、画面を維持します
 - SPA の初期化は公開の `/api/auth/status` で認証状態を確認します
-- 直接 API は `/api/auth/login` で Bearer トークンを取得します
+- 直接 API は `/api/auth/login` でアクセストークン（とリフレッシュトークン）を取得します
 - 注文・商品・顧客・請求書は `USER` / `ADMIN`、バッチは `ADMIN` のみ利用できます
 - 認可は「拒否がデフォルト」です。リソースメソッド（またはクラス）に `@RequireRole`・`@PublicEndpoint`・`@OptionalAuth`
   のどれも付いていなければ 403 になります。公開しているのは `login`・`session`（`@PublicEndpoint`）と `status`（`@OptionalAuth`）だけです
@@ -207,8 +217,10 @@ mvn -pl order-quarkus quarkus:dev
 - 同じアカウントで 5 回続けてログインに失敗すると、15 分間ロックします。ロック中・存在しないユーザー・パスワード誤りは
   すべて同じ 401 を返します。第三者がわざと失敗して他人をロックできるため、ロック時間は短めにしています。
   IP 単位の制限はリバースプロキシや WAF で行ってください
-- セッションは絶対期限 8 時間に加えて、30 分間アクセスがないと失効します（アイドルタイムアウト）。
+- セッション（リフレッシュトークン）は絶対期限 8 時間に加えて、30 分間更新がないと失効します。
   同時に保持できるのは 1 ユーザー 10 セッションまでで、11 個目にログインすると最も古いセッションが失効します
+- **失効の反映はアクセストークンの寿命（既定 10 分）まで遅れます**。無効化・ログアウト・パスワード変更は
+  リフレッシュの時点で即座に拒否され、以降新しいアクセストークンは発行されません
 - 認可は JAX-RS Filter + `@RequireRole` で行います。GlassFish で `@RolesAllowed` を JAX-RS リソースに付けると
   コンテナ認証が起動し、`/api/auth/login` まで 401 になるためです
 
@@ -593,7 +605,8 @@ CDI Startup イベント、JPA 監査、CDI トランザクションイベント
 - 一覧 API は `PageResponse`（`content` / `page` / `size` / `totalElements` など）を返します。旧来の配列レスポンスとは互換性がありません
 - CDI `Startup` イベントによる初期データ投入は 4 基盤で確認済みです。WildFly / GlassFish の CSV 取込は、サーバーの作業ディレクトリ配下に書き込み可能な `data` ディレクトリが必要です
 - CSV 取込は再実行すると同じ注文を再度作成します（重複排除は未実装）
-- 認証はアプリ発行の opaque token（Cookie / Bearer）です。Jakarta Security / OIDC ではありません
+- 認証はアプリ発行の JWT（アクセストークン）+ opaque リフレッシュトークンです。Jakarta Security / OIDC ではありません
+- アクセストークンはステートレスなので、発行済みトークンの即時失効はできません（寿命で上限を切っています）
 - デモユーザー（`order.demo-users=true`）は固定パスワードです。本番では有効にせず、`order.admin-password` などで初期パスワードを渡したうえで、IdP / MFA / パスワードリセットを検討してください
 - Cookie の `Secure` 属性は `order.cookie-secure`（`ORDER_COOKIE_SECURE`）で決めます。既定の `auto` は HTTPS のときだけ付与し、
   本番では `always` を推奨します。TLS 終端プロキシの背後では、プロキシが `X-Forwarded-Proto` を必ず上書きする構成にしたうえで

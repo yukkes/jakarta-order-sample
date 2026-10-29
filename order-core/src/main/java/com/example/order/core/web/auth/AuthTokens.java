@@ -8,6 +8,9 @@ import java.util.Optional;
 public final class AuthTokens {
 
     public static final String SESSION_COOKIE = "ORDER_SESSION";
+    /** Refresh token; only sent to {@code /api/auth}. */
+    public static final String REFRESH_COOKIE = "ORDER_REFRESH";
+    public static final String REFRESH_COOKIE_PATH = "/api/auth";
     public static final String CSRF_COOKIE = "XSRF-TOKEN";
     public static final String CSRF_HEADER = "X-XSRF-TOKEN";
 

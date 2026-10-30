@@ -10,3 +10,6 @@ target/
 
 # Local JDBC driver for Liberty
 order-liberty/src/main/liberty/config/lib/
+
+# Python bytecode from scripts/record-demo.py
+__pycache__/

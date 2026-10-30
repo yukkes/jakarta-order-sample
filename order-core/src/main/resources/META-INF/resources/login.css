@@ -1,187 +1,260 @@
+/* Login screen — same tokens as index.css (B2B Service navy palette, hairline structure).
+   Structure over decoration: a bordered card on a quiet surface, one filled action,
+   always-visible focus, 44px touch targets, light/dark via prefers-color-scheme. */
+
 :root {
-    --mui-primary: #1976d2;
-    --mui-primary-dark: #1565c0;
-    --mui-error: #d32f2f;
-    --mui-text-primary: rgba(0, 0, 0, .87);
-    --mui-text-secondary: rgba(0, 0, 0, .6);
-    --mui-divider: rgba(0, 0, 0, .12);
-    --mui-bg: #fafafa;
-    --mui-paper: #fff;
-    --mui-radius: 4px;
-    --elevation-3: 0px 3px 3px -2px rgba(0, 0, 0, .2), 0px 3px 4px 0px rgba(0, 0, 0, .14), 0px 1px 8px 0px rgba(0, 0, 0, .12);
-    --elevation-4: 0px 2px 4px -1px rgba(0, 0, 0, .2), 0px 4px 5px 0px rgba(0, 0, 0, .14), 0px 1px 10px 0px rgba(0, 0, 0, .12);
+    color-scheme: light;
+
+    --ink: #0f172a;
+    --ink-muted: #475569;
+    --ink-faint: #64748b;
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --surface-sunken: #f1f5f9;
+    --line: #e2e8f0;
+    --line-control: #8a94a6;
+
+    --accent: #0369a1;
+    --accent-press: #075985;
+    --accent-ink: #ffffff;
+    --accent-soft: #eff8ff;
+
+    --danger: #b42318;
+    --danger-soft: #fef3f2;
+    --danger-line: #fecdca;
+
+    --radius-sm: 6px;
+    --radius: 8px;
+    --radius-lg: 10px;
+    --ease-out: cubic-bezier(.23, 1, .32, 1);
+    --dur-press: 120ms;
+    --dur-fast: 160ms;
 }
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: dark;
+
+        --ink: #e6edf7;
+        --ink-muted: #a3b1c6;
+        --ink-faint: #8b9bb3;
+        --bg: #0b1220;
+        --surface: #111a2b;
+        --surface-sunken: #182337;
+        --line: #1f2b40;
+        --line-control: #5b6b85;
+
+        --accent: #38bdf8;
+        --accent-press: #7dd3fc;
+        --accent-ink: #06283d;
+        --accent-soft: #0c2b3f;
+
+        --danger: #fda29b;
+        --danger-soft: #2c1414;
+        --danger-line: #5b2320;
+    }
+}
+
 * { box-sizing: border-box; }
-html { -webkit-font-smoothing: antialiased; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
 body {
     margin: 0;
+    /* 100svh is the viewport without the collapsing URL bar; 100vh overflows on iOS. */
     min-height: 100vh;
+    min-height: 100svh;
     display: grid;
     place-items: center;
     padding: 24px;
-    background: var(--mui-bg);
-    color: var(--mui-text-primary);
-    font-family: "Roboto", "Helvetica", "Arial", sans-serif;
-    font-size: 1rem;
-    line-height: 1.5;
-    letter-spacing: .00938em;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+        Arial, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    letter-spacing: .005em;
+    font-feature-settings: "palt" 1;
 }
+
 .card {
     width: min(400px, 100%);
-    padding: 40px;
-    border-radius: var(--mui-radius);
-    background: var(--mui-paper);
-    box-shadow: var(--elevation-3);
+    padding: 32px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
 }
+
 .brand {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     margin-bottom: 24px;
 }
 .brand-mark {
-    width: 44px;
-    height: 44px;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
     display: grid;
     place-items: center;
-    color: var(--mui-primary);
+    border-radius: var(--radius-sm);
+    background: var(--accent-soft);
+    color: var(--accent);
 }
-.brand-mark svg {
-    display: block;
-    height: 34px;
-    width: auto;
-}
+.brand-mark svg { display: block; height: 20px; width: auto; }
 .brand-name {
-    color: var(--mui-text-secondary);
-    font-size: .875rem;
-    letter-spacing: .01071em;
+    color: var(--ink-muted);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: .04em;
 }
+
 h1 {
-    margin: 0 0 8px;
-    font-size: 1.5rem;
-    font-weight: 400;
-    line-height: 1.334;
-    letter-spacing: 0em;
+    margin: 0 0 6px;
+    font-size: 20px;
+    font-weight: 650;
+    line-height: 1.35;
+    letter-spacing: -.01em;
 }
 .subtitle {
-    margin: 0 0 28px;
-    color: var(--mui-text-secondary);
-    font-size: .875rem;
-    line-height: 1.43;
-    letter-spacing: .01071em;
+    margin: 0 0 20px;
+    color: var(--ink-muted);
+    font-size: 13px;
+    line-height: 1.6;
+    word-break: auto-phrase;
+    text-wrap: pretty;
 }
+
 .field {
     position: relative;
-    margin-top: 20px;
+    margin-top: 14px;
 }
 .field label {
     position: absolute;
     top: 50%;
-    left: 14px;
+    left: 11px;
     z-index: 1;
-    max-width: calc(100% - 28px);
+    max-width: calc(100% - 22px);
     padding: 0 4px;
-    background: var(--mui-paper);
-    color: var(--mui-text-secondary);
-    font-size: 1rem;
-    line-height: 1.66;
-    letter-spacing: .00938em;
+    background: var(--surface);
+    color: var(--ink-muted);
+    font-size: 14px;
+    line-height: 1.5;
     pointer-events: none;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     transform: translateY(-50%);
-    transform-origin: top left;
-    transition: top .15s, left .15s, transform .15s, letter-spacing .15s, color .15s;
+    transform-origin: left center;
+    transition: transform var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 .field:focus-within label,
 .field:has(input:not(:placeholder-shown)) label {
-    top: 0;
-    left: 12px;
-    transform: translateY(-9px) scale(.75);
-    letter-spacing: .03333em;
+    transform: translateY(-50%) translateY(-24px) scale(.8);
+    letter-spacing: .02em;
 }
 /* Password managers can fill fields before any user input; keep the
    label floated in that case too, without JavaScript. */
 .field:has(input:autofill) label,
 .field:has(input:-webkit-autofill) label {
-    top: 0;
-    left: 12px;
-    transform: translateY(-9px) scale(.75);
-    letter-spacing: .03333em;
+    transform: translateY(-50%) translateY(-24px) scale(.8);
+    letter-spacing: .02em;
 }
-.field:focus-within label { color: var(--mui-primary); }
-input {
-    width: 100%;
-    height: 56px;
-    padding: 16.5px 14px;
-    border: 1px solid rgba(0, 0, 0, .23);
-    border-radius: var(--mui-radius);
-    background: transparent;
-    color: var(--mui-text-primary);
-    font: inherit;
-    font-size: 1rem;
-    letter-spacing: .00938em;
-    transition: border-color .15s, box-shadow .15s;
-}
-input:hover { border-color: rgba(0, 0, 0, .87); }
-input:focus {
-    outline: none;
-    border-color: var(--mui-primary);
-    box-shadow: inset 0 0 0 1px var(--mui-primary);
-}
-/* Keep the MUI surface instead of Chrome's autofill background. */
-input:-webkit-autofill,
-input:-webkit-autofill:hover {
-    -webkit-text-fill-color: var(--mui-text-primary);
-    -webkit-box-shadow: inset 0 0 0 100px var(--mui-paper);
-}
-input:-webkit-autofill:focus {
-    -webkit-text-fill-color: var(--mui-text-primary);
-    -webkit-box-shadow: inset 0 0 0 100px var(--mui-paper), inset 0 0 0 1px var(--mui-primary);
+.field:focus-within label { color: var(--accent); }
+
+input, button {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 }
 button {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+input {
     width: 100%;
-    min-height: 40px;
-    margin-top: 28px;
-    padding: 8px 22px;
-    border: 0;
-    border-radius: var(--mui-radius);
-    background: var(--mui-primary);
-    color: #fff;
+    height: 48px;
+    padding: 13px 11px;
+    border: 1px solid var(--line-control);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--ink);
     font: inherit;
-    font-size: .875rem;
-    font-weight: 500;
-    letter-spacing: .02857em;
-    text-transform: uppercase;
+    font-size: 14px;
+    transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+/* Keep the surface instead of Chrome's autofill background. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover {
+    -webkit-text-fill-color: var(--ink);
+    -webkit-box-shadow: inset 0 0 0 100px var(--surface);
+}
+input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--ink);
+    -webkit-box-shadow: inset 0 0 0 100px var(--surface), 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+button {
+    width: 100%;
+    min-height: 44px;
+    margin-top: 20px;
+    padding: 10px 18px;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background: var(--accent);
+    color: var(--accent-ink);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: .01em;
     cursor: pointer;
-    box-shadow: var(--elevation-3);
-    transition: background .25s, box-shadow .25s;
+    transition: background-color var(--dur-fast) var(--ease-out), transform var(--dur-press) var(--ease-out);
 }
-button:hover { background: var(--mui-primary-dark); box-shadow: var(--elevation-4); }
+button:active { transform: scale(.985); }
 button:disabled {
-    background: rgba(0, 0, 0, .12);
-    color: rgba(0, 0, 0, .26);
-    box-shadow: none;
+    background: var(--surface-sunken);
+    color: var(--ink-faint);
     cursor: default;
+    transform: none;
 }
+
 .error {
     display: none;
-    margin-top: 20px;
-    padding: 6px 16px;
-    border-radius: var(--mui-radius);
-    background: #fdeded;
-    color: #5f2120;
-    font-size: .875rem;
-    line-height: 1.43;
-    letter-spacing: .01071em;
+    margin-top: 14px;
+    padding: 10px 12px;
+    border: 1px solid var(--danger-line);
+    border-radius: var(--radius);
+    background: var(--danger-soft);
+    color: var(--danger);
+    font-size: 13px;
+    line-height: 1.5;
 }
 .error.show { display: block; }
-:focus-visible { outline: 2px solid var(--mui-primary); outline-offset: 2px; }
+
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    input:hover { border-color: var(--ink-muted); }
+    button:not(:disabled):hover { background: var(--accent-press); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    input, button, .field label { transition-duration: 1ms; }
+    button:active { transform: none; }
+}
+
 @media (max-width: 480px) {
     body { padding: 16px; }
-    .card { padding: 28px 24px; }
-    h1 { font-size: 1.35rem; }
+    .card { padding: 24px 20px; }
+    h1 { font-size: 19px; }
 }
 
 /* Utilities. The UI must not use inline style attributes (CSP: style-src 'self'). */

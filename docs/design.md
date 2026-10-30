@@ -17,6 +17,7 @@
 | Liberty は feature 最小構成、WildFly は Galleon slim | 不要な feature / layer を外して起動時間とサイズを抑える | [runtimes.md](runtimes.md) |
 | core は仕様別 API に依存（アンブレラ `jakartaee-api` を使わない） | EJB / Servlet / Quarkus が classpath に載らないので、移植性の違反がコンパイルエラーになる。`order-core` の enforcer が二重に防ぐ | 下の「モジュール構成と移植性」 |
 | セキュリティヘッダの値は core の `SecurityHeaders` が定義 | 3 つの WAR アダプタが同じ値を参照し、Quarkus の設定値との一致をテストで強制する | 下の「セキュリティヘッダ」 |
+| UI はデザイントークン + transform/opacity のみのモーションに従う | 「良し悪し」を勘にせず、押下フィードバック・イージング・hover の端末分岐をルール化できる | 下の「UI」 |
 
 実装上の判断と、Spring Boot との対応関係です。
 
@@ -49,6 +50,37 @@ order-quarkus  liberty     wildfly     glassfish
 - Liberty の JDBC ドライバは `provided` 依存 + `maven-dependency-plugin` で `src/main/liberty/config/lib/` に配置する。
   ドライバは WAR に入れない（サーバー側の責務）
 
+### UI
+
+画面は静的な HTML/CSS と、同梱した lit-html（`resources/vendor/lit-html`）だけで描画します。
+ビルド工程を持たず、4 つの実行基盤に同じ jar を載せるためで、`script-src`/`style-src 'self'` の
+CSP もそのまま守れます。
+
+#### レイアウト
+
+- ヘッダは**白地 + ヘアライン**。色は CTA とタブの現在地だけに使い、面で塗らない
+- 注文タブは**左に新規注文・右に一覧**の 2 カラム（1080px 未満で 1 カラム）。
+  フォームと一覧が縦に積まれず、作成した結果が同じ視野に入る
+- 構造は影ではなく 1px の境界線で示す。影はトースト（オーバーレイ）だけ
+- 表はヘッダ固定・行 32px 前後・数値は右寄せ + tabular-nums。横スクロールは 767px 以下だけ
+  （デスクトップでスクロールコンテナにすると `thead` の sticky が効かなくなるため）
+
+#### 文言
+
+- 説明は**1 行まで**。CSV 取込のように条件が複数あるものは、既定値（サンプル CSV）だけを書き、
+  例外は API のエラーメッセージで返す。以前は 3 文の段落があり、パネルの高さを無駄に使っていた
+- ボタンは動詞のみ（`実行` / `注文を作成` / `行を追加`）。破壊的操作は `ghost danger` で静かに
+
+#### 振る舞い
+
+- タブは `#orders` / `#products` / `#invoices` / `#batch` に同期し、リロード・戻るで維持される。
+  `role="tablist"` の ARIA パターンに沿って ←/→/Home/End で移動できる
+- 一覧の再読込は対象パネルに `aria-busy` を立て、古い行を薄く残す（レイアウトは動かさない）
+- フィルタ類は `data-filter="orders.sort"` のように宣言し、`change` を 1 か所で受ける
+- ダークテーマは `prefers-color-scheme` でトークンを差し替えるだけ。エラートーストだけは
+  反転色（明るい赤）だと白文字が読めないため、暗い赤を別トークンにしている
+
+### セキュリティヘッダ
 ### セキュリティヘッダ
 
 CSP / `X-Content-Type-Options` / `Referrer-Policy` の**値**は `order-core` の

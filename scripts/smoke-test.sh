@@ -42,18 +42,21 @@ fi
 echo "OK: unauthenticated /api/orders -> 401"
 
 HEADERS="$(curl -sS -D - -o /dev/null "$BASE_URL/")"
-for expected in \
-    "content-security-policy: default-src 'self'" \
-    "content-security-policy: script-src 'self'" \
-    "x-content-type-options: nosniff" \
-    "referrer-policy: no-referrer"; do
-    if ! printf '%s' "$HEADERS" | tr 'A-Z' 'a-z' | grep -qiF -- "$expected"; then
-        echo "NG: セキュリティヘッダがありません: $expected" >&2
+check_header() { # substring, matched case-insensitively against the response headers
+    if ! printf '%s' "$HEADERS" | tr 'A-Z' 'a-z' | grep -qiF -- "$1"; then
+        echo "NG: セキュリティヘッダがありません: $1" >&2
         printf '%s\n' "$HEADERS" >&2
         exit 1
     fi
-done
-echo "OK: security headers match order-core SecurityHeaders"
+}
+check_header "content-security-policy:"
+check_header "default-src 'self'"
+check_header "script-src 'self'"
+check_header "style-src 'self'"
+check_header "frame-ancestors 'none'"
+check_header "x-content-type-options: nosniff"
+check_header "referrer-policy: no-referrer"
+echo "OK: security headers"
 
 check / 'orders-sort'
 check /api/products '"P001"'

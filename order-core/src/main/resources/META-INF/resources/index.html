@@ -2,15 +2,16 @@
 <html lang="ja">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="description" content="Jakarta EE 11 order management sample with JAX-RS, CDI, JPA, Bean Validation, Jakarta Batch, and portable authentication.">
-    <meta name="theme-color" content="#1976d2">
+    <meta name="theme-color" content="#0369a1">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <title>Order Sample — Jakarta EE 11</title>
     <link rel="stylesheet" href="index.css">
 </head>
 <body>
 <a class="skip-link" href="#main">本文へスキップ</a>
+
 <header class="app-bar">
     <div class="app-bar-inner">
         <div class="brand">
@@ -31,195 +32,211 @@
                 <span class="session-name" id="current-user"></span>
                 <span class="session-role" id="current-role"></span>
             </div>
-            <button class="small" type="button" data-action="logout">ログアウト</button>
+            <button class="secondary small" type="button" data-action="logout">ログアウト</button>
         </div>
     </div>
 </header>
 
 <nav class="tabs" aria-label="メインナビゲーション" role="tablist">
     <div class="tabs-inner">
-        <button class="active" id="tab-orders-button" data-tab="orders" role="tab" aria-selected="true" aria-current="page" aria-controls="tab-orders">注文</button>
-        <button id="tab-products-button" data-tab="products" role="tab" aria-selected="false" aria-controls="tab-products">商品</button>
-        <button id="tab-invoices-button" data-tab="invoices" role="tab" aria-selected="false" aria-controls="tab-invoices">請求書</button>
-        <button id="tab-batch-button" data-tab="batch" role="tab" aria-selected="false" aria-controls="tab-batch">バッチ</button>
+        <button class="active" id="tab-orders-button" data-tab="orders" role="tab"
+                aria-selected="true" aria-current="page" aria-controls="tab-orders">注文</button>
+        <button id="tab-products-button" data-tab="products" role="tab"
+                aria-selected="false" aria-controls="tab-products">商品</button>
+        <button id="tab-invoices-button" data-tab="invoices" role="tab"
+                aria-selected="false" aria-controls="tab-invoices">請求書</button>
+        <button id="tab-batch-button" data-tab="batch" role="tab"
+                aria-selected="false" aria-controls="tab-batch">バッチ</button>
     </div>
 </nav>
 
 <main id="main" tabindex="-1">
-    <section class="card" id="tab-orders" role="tabpanel" aria-labelledby="tab-orders-button" aria-hidden="false">
-        <div class="section-head">
-            <div>
-                <h2>注文</h2>
-                <p class="hint">注文は DRAFT → CONFIRMED → INVOICED と進みます。確定時に在庫を引き当てます。</p>
-            </div>
-            <button class="ghost small" data-action="reload-orders">再読込</button>
-        </div>
-
-        <form id="order-form">
-            <div class="row">
-                <div class="field">
-                    <label for="customer">顧客</label>
-                    <select id="customer" required></select>
+    <section class="tab-panel" id="tab-orders" role="tabpanel" aria-labelledby="tab-orders-button" aria-hidden="false">
+        <div class="split">
+            <form class="panel" id="order-form">
+                <div class="panel-head">
+                    <div>
+                        <h2>新規注文</h2>
+                        <p class="hint">確定で在庫を引き当てます。</p>
+                    </div>
                 </div>
-                <div class="field">
-                    <label for="order-date">注文日</label>
-                    <input type="date" id="order-date">
+                <div class="fields-2">
+                    <div class="field">
+                        <label for="customer">顧客</label>
+                        <select id="customer" required></select>
+                    </div>
+                    <div class="field">
+                        <label for="order-date">注文日</label>
+                        <input type="date" id="order-date">
+                    </div>
                 </div>
-            </div>
-            <h3>明細</h3>
-            <div id="lines"></div>
-            <div class="row mt-8">
-                <button type="button" class="secondary" id="add-line">明細を追加</button>
-                <button type="submit">注文を作成</button>
-            </div>
-        </form>
+                <div class="lines-head">
+                    <h3>明細</h3>
+                    <button type="button" class="ghost small" id="add-line">行を追加</button>
+                </div>
+                <div id="lines"></div>
+                <button type="submit" class="block">注文を作成</button>
+            </form>
 
-        <h3>注文一覧</h3>
-        <div class="row mb-10">
-            <div class="field">
-                <label for="orders-status">ステータス</label>
-                <select id="orders-status">
-                    <option value="">すべて</option>
-                    <option value="DRAFT">DRAFT</option>
-                    <option value="CONFIRMED">CONFIRMED</option>
-                    <option value="INVOICED">INVOICED</option>
-                    <option value="CANCELLED">CANCELLED</option>
-                </select>
-            </div>
-            <div class="field">
-                <label for="orders-sort">並び順</label>
-                <select id="orders-sort">
-                    <option value="id,desc">ID 降順</option>
-                    <option value="id,asc">ID 昇順</option>
-                    <option value="orderDate,desc">注文日 降順</option>
-                    <option value="orderDate,asc">注文日 昇順</option>
-                    <option value="status,asc">ステータス 昇順</option>
-                    <option value="totalAmount,desc">金額 降順</option>
-                </select>
-            </div>
-            <div class="field">
-                <label for="orders-size">表示件数</label>
-                <select id="orders-size">
-                    <option value="2">2</option>
-                    <option value="5">5</option>
-                    <option value="10" selected>10</option>
-                    <option value="20">20</option>
-                </select>
-            </div>
+            <section class="panel" aria-labelledby="orders-list-title">
+                <div class="panel-head">
+                    <h2 id="orders-list-title">注文一覧</h2>
+                    <div class="toolbar">
+                        <div class="field tool">
+                            <label for="orders-status">ステータス</label>
+                            <select id="orders-status" data-filter="orders.status">
+                                <option value="">すべて</option>
+                                <option value="DRAFT">DRAFT</option>
+                                <option value="CONFIRMED">CONFIRMED</option>
+                                <option value="INVOICED">INVOICED</option>
+                                <option value="CANCELLED">CANCELLED</option>
+                            </select>
+                        </div>
+                        <div class="field tool">
+                            <label for="orders-sort">並び順</label>
+                            <select id="orders-sort" data-filter="orders.sort">
+                                <option value="id,desc">ID 降順</option>
+                                <option value="id,asc">ID 昇順</option>
+                                <option value="orderDate,desc">注文日 降順</option>
+                                <option value="orderDate,asc">注文日 昇順</option>
+                                <option value="status,asc">ステータス 昇順</option>
+                                <option value="totalAmount,desc">金額 降順</option>
+                            </select>
+                        </div>
+                        <div class="field tool">
+                            <label for="orders-size">件数</label>
+                            <select id="orders-size" data-filter="orders.size">
+                                <option value="2">2</option>
+                                <option value="5">5</option>
+                                <option value="10" selected>10</option>
+                                <option value="20">20</option>
+                            </select>
+                        </div>
+                        <button type="button" class="ghost small" data-action="reload-orders">再読込</button>
+                    </div>
+                </div>
+                <div id="orders-body"></div>
+            </section>
         </div>
-        <div id="orders-body"></div>
     </section>
 
-    <section class="card hidden" id="tab-products" role="tabpanel" aria-labelledby="tab-products-button" aria-hidden="true">
-        <div class="section-head">
-            <div>
-                <h2>商品</h2>
-                <p class="hint">在庫は注文確定時に減り、キャンセル時に戻ります。</p>
-            </div>
-            <button class="ghost small" data-action="reload-products">再読込</button>
-        </div>
-        <div class="row mb-10">
-            <div class="field">
-                <label for="products-sort">並び順</label>
-                <select id="products-sort">
-                    <option value="code,asc">コード 昇順</option>
-                    <option value="code,desc">コード 降順</option>
-                    <option value="name,asc">商品名 昇順</option>
-                    <option value="unitPrice,desc">単価 降順</option>
-                    <option value="stock,desc">在庫 降順</option>
-                    <option value="stock,asc">在庫 昇順</option>
-                </select>
-            </div>
-            <div class="field">
-                <label for="products-size">表示件数</label>
-                <select id="products-size">
-                    <option value="2">2</option>
-                    <option value="5">5</option>
-                    <option value="10" selected>10</option>
-                    <option value="20">20</option>
-                </select>
-            </div>
-        </div>
-        <div id="products-body"></div>
-    </section>
-
-    <section class="card hidden" id="tab-invoices" role="tabpanel" aria-labelledby="tab-invoices-button" aria-hidden="true">
-        <div class="section-head">
-            <div>
-                <h2>請求書</h2>
-                <p class="hint">請求書バッチが CONFIRMED の注文を対象に生成します。</p>
-            </div>
-            <div class="row">
-                <div class="field">
-                    <label for="invoice-month">対象月</label>
-                    <input type="month" id="invoice-month">
+    <section class="tab-panel hidden" id="tab-products" role="tabpanel" aria-labelledby="tab-products-button" aria-hidden="true">
+        <section class="panel">
+            <div class="panel-head">
+                <h2 id="products-list-title">商品</h2>
+                <div class="toolbar">
+                    <div class="field tool">
+                        <label for="products-sort">並び順</label>
+                        <select id="products-sort" data-filter="products.sort">
+                            <option value="code,asc">コード 昇順</option>
+                            <option value="code,desc">コード 降順</option>
+                            <option value="name,asc">商品名 昇順</option>
+                            <option value="unitPrice,desc">単価 降順</option>
+                            <option value="stock,desc">在庫 降順</option>
+                            <option value="stock,asc">在庫 昇順</option>
+                        </select>
+                    </div>
+                    <div class="field tool">
+                        <label for="products-size">件数</label>
+                        <select id="products-size" data-filter="products.size">
+                            <option value="2">2</option>
+                            <option value="5">5</option>
+                            <option value="10" selected>10</option>
+                            <option value="20">20</option>
+                        </select>
+                    </div>
+                    <button type="button" class="ghost small" data-action="reload-products">再読込</button>
                 </div>
-                <button class="ghost small" data-action="reload-invoices">再読込</button>
             </div>
-        </div>
-        <div class="row mb-10">
-            <div class="field">
-                <label for="invoices-sort">並び順</label>
-                <select id="invoices-sort">
-                    <option value="id,desc">ID 降順</option>
-                    <option value="id,asc">ID 昇順</option>
-                    <option value="invoiceNo,asc">請求書番号 昇順</option>
-                    <option value="billingMonth,desc">対象月 降順</option>
-                    <option value="totalAmount,desc">税抜金額 降順</option>
-                    <option value="createdAt,desc">作成日時 降順</option>
-                </select>
-            </div>
-            <div class="field">
-                <label for="invoices-size">表示件数</label>
-                <select id="invoices-size">
-                    <option value="2">2</option>
-                    <option value="5">5</option>
-                    <option value="10" selected>10</option>
-                    <option value="20">20</option>
-                </select>
-            </div>
-        </div>
-        <div id="invoices-body"></div>
+            <div id="products-body"></div>
+        </section>
     </section>
 
-    <section class="card hidden" id="tab-batch" role="tabpanel" aria-labelledby="tab-batch-button" aria-hidden="true">
-        <div class="section-head">
-            <div>
-                <h2>バッチ</h2>
-                <p class="hint">Jakarta Batch のチャンクジョブとバッチレットを REST から起動します。</p>
+    <section class="tab-panel hidden" id="tab-invoices" role="tabpanel" aria-labelledby="tab-invoices-button" aria-hidden="true">
+        <section class="panel">
+            <div class="panel-head">
+                <h2 id="invoices-list-title">請求書</h2>
+                <div class="toolbar">
+                    <div class="field tool">
+                        <label for="invoice-month">対象月</label>
+                        <input type="month" id="invoice-month">
+                    </div>
+                    <div class="field tool">
+                        <label for="invoices-sort">並び順</label>
+                        <select id="invoices-sort" data-filter="invoices.sort">
+                            <option value="id,desc">ID 降順</option>
+                            <option value="id,asc">ID 昇順</option>
+                            <option value="invoiceNo,asc">請求書番号 昇順</option>
+                            <option value="billingMonth,desc">対象月 降順</option>
+                            <option value="totalAmount,desc">税抜金額 降順</option>
+                            <option value="createdAt,desc">作成日時 降順</option>
+                        </select>
+                    </div>
+                    <div class="field tool">
+                        <label for="invoices-size">件数</label>
+                        <select id="invoices-size" data-filter="invoices.size">
+                            <option value="2">2</option>
+                            <option value="5">5</option>
+                            <option value="10" selected>10</option>
+                            <option value="20">20</option>
+                        </select>
+                    </div>
+                    <button type="button" class="ghost small" data-action="reload-invoices">再読込</button>
+                </div>
             </div>
-            <button class="ghost small" data-action="reload-executions">再読込</button>
-        </div>
+            <div id="invoices-body"></div>
+        </section>
+    </section>
 
-        <div class="grid-2">
-            <div>
-                <h3>請求書生成（チャンク）</h3>
-                <p class="hint">対象月の CONFIRMED 注文を 5 件ずつ読み、請求書を書き込みます。skip-limit と checkpoint 付き。</p>
-                <div class="row">
+    <section class="tab-panel hidden" id="tab-batch" role="tabpanel" aria-labelledby="tab-batch-button" aria-hidden="true">
+        <div class="jobs">
+            <section class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>請求書生成</h2>
+                        <p class="hint">対象月の CONFIRMED 注文から作成します。</p>
+                    </div>
+                </div>
+                <div class="fields-inline">
                     <div class="field">
                         <label for="batch-month">対象月</label>
                         <input type="month" id="batch-month">
                     </div>
-                    <button type="button" data-action="start-invoice-job">バッチ実行</button>
+                    <button type="button" data-action="start-invoice-job">実行</button>
                 </div>
-            </div>
-            <div>
-                <h3>注文 CSV 取込（バッチレット）</h3>
-                <p class="hint">既定では classpath の <span class="mono">data/orders-import.csv</span> を読み、1 行ずつ独立トランザクションで登録します。入力ファイルを指定する場合は、サーバーの取込ディレクトリ（既定 <span class="mono">data/import/</span>）に置いた <span class="mono">.csv</span> のファイル名だけを入力してください（例: <span class="mono">orders.csv</span>）。</p>
-                <div class="row">
-                    <div class="field">
-                        <label for="import-file">入力ファイル名（任意）</label>
-                        <input type="text" id="import-file" placeholder=" ">
+            </section>
+
+            <section class="panel">
+                <div class="panel-head">
+                    <div>
+                        <h2>CSV 取込</h2>
+                        <p class="hint">空欄ならサンプル CSV を取り込みます。</p>
                     </div>
-                    <button type="button" data-action="start-import-job">取込実行</button>
                 </div>
-            </div>
+                <div class="fields-inline">
+                    <div class="field">
+                        <label for="import-file">ファイル名（任意）</label>
+                        <input type="text" id="import-file" placeholder=" " autocomplete="off">
+                    </div>
+                    <button type="button" data-action="start-import-job">実行</button>
+                </div>
+            </section>
         </div>
 
-        <div id="exec-box" class="exec-box" hidden></div>
+        <section class="panel" id="execution-panel" aria-labelledby="execution-title" hidden>
+            <div class="panel-head">
+                <h2 id="execution-title">実行状況</h2>
+            </div>
+            <div id="exec-box" class="exec-box"></div>
+        </section>
 
-        <h3>最近のジョブ実行</h3>
-        <div id="executions-body"></div>
+        <section class="panel">
+            <div class="panel-head">
+                <h2 id="executions-list-title">最近の実行</h2>
+                <button type="button" class="ghost small" data-action="reload-executions">再読込</button>
+            </div>
+            <div id="executions-body"></div>
+        </section>
     </section>
 </main>
 

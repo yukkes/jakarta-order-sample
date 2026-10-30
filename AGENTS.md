@@ -36,6 +36,16 @@ Keep it portable.
 - Dynamic markup is rendered with the vendored lit-html (`resources/vendor/lit-html`, 3.3.3, BSD-3-Clause);
   do not build HTML strings or set `innerHTML` for data. Static buttons keep `data-action`.
 - Floating labels and focus styling are CSS-only; do not add JS class toggles for them.
+- UI copy is one line per panel. Do not reintroduce multi-sentence hints: put the default
+  behaviour in the label/hint and let API error messages explain the exception.
+- Tabs are deep-linkable (`#orders`, `#products`, `#invoices`, `#batch`) and follow the ARIA
+  tabs pattern (arrow/Home/End); keep both when changing the markup.
+- UI rules: animate only `transform`/`opacity`, ease-out with
+  custom curves under 300ms, scale(0.97) on press, gate every `:hover` behind
+  `@media (hover: hover) and (pointer: fine)`, and keep `prefers-reduced-motion` working.
+  Tokens (colour, radius, shadow, easing, durations) live at the top of `index.css`/`login.css`;
+  add a token instead of hardcoding a value. Destructive row actions use `ghost small danger`,
+  never a filled red button next to the primary action.
 
 ## Commands
 ```bash
